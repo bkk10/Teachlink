@@ -1,0 +1,7 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+    {% include "components/breadcrumbs.html" with breadcrumbs=breadcrumbs %}
+    {% include "components/lesson_editor.html" with lesson=lesson %}
+    {% include "components/ai_quiz_suggestion.html" with lesson=lesson %}
+{% endblock %}

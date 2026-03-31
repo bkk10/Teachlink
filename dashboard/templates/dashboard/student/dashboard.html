@@ -1,0 +1,734 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}Student Overview{% endblock %}
+
+{% block extra_css %}
+<style>
+    .student-hero {
+        background: linear-gradient(120deg, #0b5ed7 0%, #1d4ed8 55%, #1e40af 100%);
+        border-radius: 1rem;
+        color: #fff;
+        box-shadow: 0 0.9rem 1.8rem rgba(30, 64, 175, 0.2);
+    }
+    .dashboard-card { border: 0; box-shadow: 0 0.45rem 1rem rgba(2, 6, 23, 0.08); border-radius: 0.9rem; }
+    .metric-label { font-size: 0.78rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric-value { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
+    .course-row { border: 1px solid #e2e8f0; border-radius: 0.8rem; padding: 0.9rem; min-height: 245px; }
+    .course-row + .course-row { margin-top: 0.75rem; }
+    .progress-thin { height: 7px; }
+    .hero-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.45rem 0.75rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        font-size: 0.86rem;
+    }
+    .hero-chip strong { font-weight: 700; }
+    .awareness-card {
+        border: 1px solid #dbeafe;
+        border-radius: 0.9rem;
+        background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+    }
+    .awareness-stat {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.8rem;
+        padding: 0.85rem;
+        height: 100%;
+        background: #fff;
+    }
+    .awareness-stat-label {
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+    }
+    .awareness-stat-value {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <section class="student-hero p-4 p-md-5 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="opacity-75 small mb-1">Student Overview</div>
+                <h3 class="fw-bold mb-2">Hello, {{ student_name }}</h3>
+                <p id="encouragementMessage" class="mb-0 opacity-75">Loading your personalized learning insight...</p>
+            </div>
+            <div class="text-end">
+                <!-- PROMINENT: Risk badge restored to hero section -->
+                <div id="heroRiskBadge" class="mb-2">
+                    <div class="small opacity-75">Your Course Health</div>
+                    <div id="riskBadgeDisplay" class="display-6 fw-bold" style="min-height: 3.5rem;">Loading...</div>
+                </div>
+                <div class="small opacity-75">{{ current_date }}</div>
+                <div id="overallProgress" class="display-6 fw-bold">0%</div>
+                <div class="small opacity-75">Overall Progress</div>
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2 flex-wrap">
+            <a href="{% url 'dashboard_courses' %}" class="btn btn-light btn-sm">
+                <i class="fas fa-book-open me-1"></i>Open My Courses
+            </a>
+        </div>
+        <div id="heroAwareness" class="mt-3 d-flex flex-wrap gap-2"></div>
+    </section>
+
+    <section id="quickStats" class="row g-3 mb-4">
+        <div class="col-12 text-muted">Loading your metrics...</div>
+    </section>
+
+    <div class="row g-4">
+        <div class="col-xl-8">
+            <section class="card dashboard-card mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">Current Courses</h6>
+                    <a href="{% url 'dashboard_courses' %}" class="btn btn-sm btn-outline-primary">My Courses</a>
+                </div>
+                <div class="card-body" id="coursesList">
+                    <div class="text-muted">Loading courses...</div>
+                </div>
+            </section>
+
+            <section id="quiz-performance" class="card dashboard-card">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold">Recent Quiz Attempts</h6>
+                </div>
+                <div class="card-body">
+                    <div id="performanceTrendWrap" style="height: 280px;">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                    <div id="noPerformanceData" class="small text-muted mt-3">
+                        No completed quiz attempts yet.
+                    </div>
+                    <div class="mt-4">
+                        <h6 class="fw-semibold mb-2">Attempt History</h6>
+                        <div id="recentQuizAttempts" class="list-group list-group-flush">
+                            <div class="list-group-item text-muted px-0">Loading recent attempts...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="notifications" class="card dashboard-card mt-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">Notifications</h6>
+                    <span class="small text-muted">From your teachers</span>
+                </div>
+                <div id="notificationsList" class="list-group list-group-flush">
+                    <div class="list-group-item text-muted">Loading notifications...</div>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-xl-4">
+            <!-- NEW: Risk Explainability Card - shows breakdown of why student has their risk level -->
+            <section id="riskExplainCard" class="card dashboard-card mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold">Why Your Risk Level?</h6>
+                </div>
+                <div class="card-body" id="riskExplainContent">
+                    <div class="text-muted">Loading your risk analysis...</div>
+                </div>
+            </section>
+
+            <section class="card dashboard-card mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold">Learning Status</h6>
+                </div>
+                <div class="card-body" id="focusStatusCard">
+                    <div class="text-muted">Loading your learning status...</div>
+                </div>
+            </section>
+
+            <section id="deadlinesCard" class="card dashboard-card mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold">Upcoming Deadlines</h6>
+                </div>
+                <div id="deadlinesList" class="list-group list-group-flush">
+                    <div class="list-group-item text-muted">Loading deadlines...</div>
+                </div>
+            </section>
+
+            <section class="card dashboard-card">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold">Recommended Next Steps</h6>
+                </div>
+                <div class="card-body">
+                    <ul id="nextSteps" class="mb-0 ps-3"></ul>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let performanceChart = null;
+
+$(function () {
+    loadStudentDashboard();
+    $(document).on("click", ".mark-read-btn", function() {
+        const alertId = $(this).data("id");
+        if (!alertId) return;
+
+        $.ajax({
+            url: "{% url 'student_notifications_api' %}",
+            method: "POST",
+            contentType: "application/json",
+            headers: { "X-CSRFToken": getCSRFToken() },
+            data: JSON.stringify({ alert_id: alertId }),
+            success: function(resp) {
+                if (resp && typeof resp.unread_count !== "undefined") {
+                    setSidebarUnreadCount(resp.unread_count);
+                }
+                loadStudentDashboard();
+            }
+        });
+    });
+
+    $(document).on("click", ".report-difficulty-btn", function() {
+        const courseId = $(this).data("course-id");
+        const lessonId = $(this).data("lesson-id");
+        if (!courseId) return;
+        reportDifficulty(courseId, lessonId);
+    });
+});
+
+function loadStudentDashboard() {
+    $.ajax({
+        url: "{% url 'student_api' %}",
+        method: "GET",
+        success: function (data) {
+            window.__notificationSuppressedCount = Number(data.notifications_suppressed_count || 0);
+            renderHeader(data);
+            renderStats(data);
+            renderCourses(data.courses || []);
+            renderRiskExplainability(data); // NEW: render risk explainability card
+            renderPerformance(data.performance_trend || []);
+            renderRecentAttempts(data.recent_quiz_attempts || []);
+            renderNotifications(data.notifications || []);
+            renderDeadlines(data.upcoming_deadlines || []);
+            renderFocusStatus(data.focus_status || {}, data);
+            renderNextSteps(data);
+            if (typeof data.unread_count !== "undefined") {
+                setSidebarUnreadCount(data.unread_count);
+            }
+        },
+        error: function (xhr) {
+            console.error("Student dashboard load failed:", xhr.status, xhr.responseText);
+            $("#quickStats").html('<div class="col-12 text-danger">Unable to load dashboard data right now.</div>');
+            $("#coursesList").html('<div class="text-danger">Unable to load courses.</div>');
+            $("#deadlinesList").html('<div class="list-group-item text-danger">Unable to load deadlines.</div>');
+            $("#notificationsList").html('<div class="list-group-item text-danger">Unable to load notifications.</div>');
+        }
+    });
+}
+
+function setSidebarUnreadCount(count) {
+    const badge = $("#sidebarUnreadCount");
+    const value = Number(count || 0);
+    badge.text(value);
+    badge.toggleClass("d-none", value <= 0);
+}
+
+function renderHeader(data) {
+    $("#overallProgress").text((Number(data.overall_progress || 0).toFixed(1)) + "%");
+    const focus = data.focus_status || {};
+    const heroMessage = focus.summary_message || ((data.encouragement && data.encouragement.message) ? data.encouragement.message : "Stay consistent, one lesson at a time.");
+    $("#encouragementMessage").text(heroMessage);
+
+    // RESTORED: Risk badge in hero section with positive framing
+    if (focus.risk_level) {
+        const riskClass = riskBadge(focus.risk_level);
+        const riskScore = Number(focus.risk_score_pct || 0);
+        // Reframe: instead of "HIGH RISK", show as success probability with positive messaging
+        const successPct = Math.max(0, 100 - riskScore);
+        const healthLabel = successPct >= 70 ? '✓ On Track' : (successPct >= 40 ? '⚠️ At Risk' : '🚨 Critical');
+        $("#riskBadgeDisplay").html(`<span class="badge ${riskClass} fs-5">${healthLabel}</span><br><small class="text-muted">${successPct.toFixed(0)}% Success</small>`);
+    }
+
+    const chips = [];
+    if (focus.risk_level) {
+        chips.push(`<span class="hero-chip"><i class="fas fa-shield-heart"></i><strong>${focus.risk_level}</strong> risk</span>`);
+    }
+    if (focus.engagement_level) {
+        chips.push(`<span class="hero-chip"><i class="fas fa-chart-line"></i><strong>${focus.engagement_level}</strong> engagement</span>`);
+    }
+    if (typeof focus.days_inactive_count !== "undefined") {
+        const label = Number(focus.days_inactive_count || 0) === 0 ? "Active today" : `${focus.days_inactive_count} day(s) inactive`;
+        chips.push(`<span class="hero-chip"><i class="fas fa-clock"></i>${label}</span>`);
+    }
+    if (Number(data.pending_assessments_total || 0) > 0) {
+        chips.push(`<span class="hero-chip"><i class="fas fa-file-pen"></i>${data.pending_assessments_total} assessment(s) waiting</span>`);
+    }
+    $("#heroAwareness").html(chips.join(""));
+}
+
+function statBox(label, value, icon, color) {
+    return `
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card dashboard-card h-100">
+                <div class="card-body d-flex align-items-center">
+                    <span class="rounded-circle d-inline-flex justify-content-center align-items-center ${color} text-white me-3" style="width:40px;height:40px;">
+                        <i class="${icon}"></i>
+                    </span>
+                    <div>
+                        <div class="metric-label">${label}</div>
+                        <div class="metric-value">${value}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderStats(data) {
+     const focus = data.focus_status || {};
+     const riskValue = focus.risk_level ? `${focus.risk_level} (${Number(focus.risk_score_pct || 0).toFixed(0)}%)` : "Not enough data";
+     const engagementValue = focus.engagement_level ? `${focus.engagement_level} (${Number(focus.engagement_score_pct || data.overall_engagement_score_pct || 0).toFixed(0)}%)` : "Not enough data";
+     const inactivityValue = typeof focus.days_inactive_count !== "undefined"
+         ? (Number(focus.days_inactive_count || 0) === 0 ? "Active today" : `${focus.days_inactive_count} day(s)`)
+         : "Not enough data";
+     const pendingAssessments = data.pending_assessments_total || 0;
+ 
+     const html = [
+         statBox("Current Risk", riskValue, "fas fa-triangle-exclamation", "bg-danger"),
+         statBox("Engagement", engagementValue, "fas fa-heart-pulse", "bg-success"),
+         statBox("Inactivity", inactivityValue, "fas fa-clock", "bg-info"),
+         statBox("Assessments Waiting", pendingAssessments, "fas fa-file-signature", "bg-warning")
+     ].join("");
+ 
+     $("#quickStats").html(html);
+ }
+
+// NEW: Render risk explainability card showing breakdown of risk factors
+function renderRiskExplainability(data) {
+    const focus = data.focus_status || {};
+    if (!focus.risk_level || !focus.course_title) {
+        $("#riskExplainCard").addClass("d-none");
+        return;
+    }
+    $("#riskExplainCard").removeClass("d-none");
+
+    const riskClass = riskBadge(focus.risk_level);
+    const factors = (focus.risk_explainability || {}).factors || [];
+    
+    let html = `
+        <div class="mb-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge ${riskClass} fs-6">${focus.risk_level}</span>
+                <span class="fw-semibold">${Number(focus.risk_score_pct || 0).toFixed(1)}%</span>
+            </div>
+            <div class="small text-muted">This score is based on three main factors:</div>
+        </div>
+    `;
+
+    if (factors && factors.length > 0) {
+        html += `<div class="row g-2">`;
+        factors.forEach(f => {
+            const factorColor = f.contribution_pct >= 40 ? "danger" : (f.contribution_pct >= 25 ? "warning" : "info");
+            html += `
+                <div class="col-12">
+                    <div class="p-2 border rounded small">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <strong>${f.name}</strong>
+                            <span class="badge text-bg-${factorColor}">${Number(f.contribution_pct || 0).toFixed(0)}%</span>
+                        </div>
+                        <div class="text-muted mt-1">${f.value_display || "Value data pending"}</div>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    } else {
+        html += `<div class="text-muted small">Risk factors are being calculated. Please refresh in a moment.</div>`;
+    }
+
+    html += `<div class="alert alert-info small mt-3 mb-0">
+        <strong>💡 Tip:</strong> Improving your engagement and quiz performance will directly lower your risk level.
+    </div>`;
+
+    $("#riskExplainContent").html(html);
+}
+
+function riskBadge(level) {
+    const map = { LOW: "text-bg-success", MEDIUM: "text-bg-warning", HIGH: "text-bg-danger", CRITICAL: "text-bg-danger" };
+    return map[level] || "text-bg-secondary";
+}
+
+function renderCourses(courses) {
+    if (!courses.length) {
+        $("#coursesList").html(`
+            <div class="text-center py-4">
+                <div class="text-muted mb-3">You are not enrolled in any active courses.</div>
+                <a href="{% url 'dashboard_courses' %}" class="btn btn-outline-primary btn-sm">Go to Courses</a>
+            </div>
+        `);
+        return;
+    }
+
+    const html = courses.map(c => `
+        <div class="course-row">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                    <div class="fw-semibold">
+                        <a href="${c.my_course_url || c.course_assessment_url}" class="text-decoration-none">${c.course_title}</a>
+                    </div>
+                    <small class="text-muted">Average quiz score: ${Math.round(c.avg_score || 0)}%</small>
+                </div>
+                <span class="badge ${riskBadge(c.risk_level)}">${c.risk_level || "UNKNOWN"}</span>
+            </div>
+
+            <div class="mb-2">
+                <div class="d-flex justify-content-between small text-muted mb-1">
+                    <span>Progress</span>
+                    <span>${Math.round(c.progress || 0)}%</span>
+                </div>
+                <div class="progress progress-thin">
+                    <div class="progress-bar" role="progressbar" style="width: ${Math.round(c.progress || 0)}%"></div>
+                </div>
+            </div>
+
+            <div class="small">
+                ${c.next_lesson ? `<span class="text-muted">Next lesson:</span> ${c.next_lesson.title}` : `<span class="text-muted">No pending lesson.</span>`}
+            </div>
+
+            <div class="mt-2 small text-muted">
+                ${c.expected_progress !== null && c.expected_progress !== undefined
+                    ? `Expected progress: ${Math.round(c.expected_progress)}%`
+                    : `Expected progress: n/a`}
+                ${c.progress_gap !== null && c.progress_gap !== undefined && c.progress_gap > 0
+                    ? `<span class="text-danger ms-2">(${Math.round(c.progress_gap)}% behind)</span>`
+                    : ``}
+            </div>
+
+            <div class="small mt-2 border rounded p-2">
+                <div class="fw-semibold mb-1">
+                    Why this risk level? Risk Score: ${Number((c.risk_explainability || {}).score_pct || 0).toFixed(1)}% (${c.risk_level || "UNKNOWN"})
+                </div>
+                <div class="text-muted mb-1">Lower is better: 0-40% LOW, 40-70% MEDIUM, 70-100% HIGH.</div>
+                ${((c.risk_explainability || {}).factors && (c.risk_explainability || {}).factors.length) ? ((c.risk_explainability || {}).factors || []).slice(0, 3).map(f => `
+                    <div class="d-flex justify-content-between">
+                        <span>${f.name} (${f.value_display})</span>
+                        <span>${Number(f.contribution_pct || 0).toFixed(1)}%</span>
+                    </div>
+                `).join("") : `<div class="text-muted">Risk factors are being calculated. Please refresh in a moment.</div>`}
+            </div>
+
+            <div class="mt-3 d-flex gap-2">
+                ${c.next_lesson && c.next_lesson.open_url
+                    ? `<a href="${c.next_lesson.open_url}" class="btn btn-sm btn-primary">Continue Lesson</a>`
+                    : `<a href="${c.my_course_url || c.course_assessment_url}" class="btn btn-sm btn-primary">Open in My Courses</a>`}
+                <a href="${c.my_course_url || c.course_assessment_url}" class="btn btn-sm btn-outline-secondary">Open Course Plan</a>
+                <button class="btn btn-sm btn-outline-warning report-difficulty-btn" data-course-id="${c.course_id}">
+                    <i class="fas fa-flag me-1"></i>Report Difficulty
+                </button>
+            </div>
+        </div>
+    `).join("");
+
+    $("#coursesList").html(html);
+}
+
+function renderPerformance(points) {
+    const canvas = document.getElementById("performanceChart");
+    if (!canvas) return;
+    if (performanceChart) performanceChart.destroy();
+
+    if (!points.length) {
+        $("#performanceTrendWrap").hide();
+        $("#noPerformanceData").show();
+        return;
+    }
+    $("#performanceTrendWrap").show();
+    $("#noPerformanceData").hide();
+
+    performanceChart = new Chart(canvas, {
+        type: "line",
+        data: {
+            labels: points.map(p => {
+                const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
+                const dateLabel = isNaN(d.getTime()) ? (p.date || "") : d.toLocaleDateString();
+                return `${dateLabel} - ${p.quiz || "Quiz"}`;
+            }),
+            datasets: [{
+                label: "Score %",
+                data: points.map(p => p.score),
+                borderColor: "#0d6efd",
+                backgroundColor: "rgba(13,110,253,0.12)",
+                pointRadius: 3,
+                fill: true,
+                tension: 0.25
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(v) { return v + "%"; }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderRecentAttempts(attempts) {
+    if (!attempts.length) {
+        $("#recentQuizAttempts").html('<div class="list-group-item text-muted px-0">No quiz attempts yet.</div>');
+        return;
+    }
+
+    const html = attempts.map(a => {
+        const scoreClass = a.passed ? "text-success" : "text-danger";
+        const statusLabel = a.status === "TIMED_OUT" ? "Timed out" : (a.passed ? "Passed" : "Needs review");
+        const date = a.date ? new Date(a.date).toLocaleString() : "Unknown date";
+        return `
+            <div class="list-group-item px-0">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <div class="fw-semibold">${a.quiz_title} <span class="badge text-bg-light text-dark border">Best: ${Math.round(a.best_score || a.score || 0)}%</span></div>
+                        <div class="small text-muted">${a.course_title} - ${date}</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold ${scoreClass}">${Math.round(a.score || 0)}%</div>
+                        <div class="small text-muted">${statusLabel}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join("");
+    $("#recentQuizAttempts").html(html);
+}
+
+function renderDeadlines(deadlines) {
+    const card = $("#deadlinesCard");
+    if (!deadlines.length) {
+        card.addClass("d-none");
+        return;
+    }
+    card.removeClass("d-none");
+
+    const html = deadlines.map(d => `
+        <div class="list-group-item">
+            <div class="fw-semibold">${d.course_title}</div>
+            <div class="small text-muted">Due in ${d.days_left} day(s)</div>
+            <div class="small text-muted">Current progress: ${Math.round(d.current_progress || 0)}%</div>
+            ${d.expected_progress !== null && d.expected_progress !== undefined
+                ? `<div class="small text-muted">Expected progress by now: ${Math.round(d.expected_progress)}%</div>`
+                : ``}
+        </div>
+    `).join("");
+
+    $("#deadlinesList").html(html);
+}
+
+function renderNotifications(notifications) {
+    if (!notifications.length) {
+        $("#notificationsList").html('<div class="list-group-item text-muted">No notifications yet.</div>');
+        return;
+    }
+
+    const severityClass = { CRITICAL: "danger", HIGH: "danger", MEDIUM: "warning", LOW: "info", INFO: "secondary" };
+    const html = notifications.map(n => `
+        <div class="list-group-item">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <div class="fw-semibold">${n.title || "Notification"}</div>
+                    <div class="small text-muted">${n.teacher_name || "Teacher"} - ${n.course_title || "N/A"}</div>
+                    <div class="small text-muted">${n.generated_at ? new Date(n.generated_at).toLocaleString() : ""}</div>
+                    <div class="small text-muted">${n.message || ""}</div>
+                </div>
+                <div class="text-end">
+                    <span class="badge text-bg-${severityClass[n.severity] || "secondary"}">${n.severity || "INFO"}</span>
+                    ${n.status === "ACTIVE" ? `<button type="button" class="btn btn-sm btn-outline-secondary mt-2 mark-read-btn" data-id="${n.id}">Mark as read</button>` : `<div class="small text-success mt-2">Read</div>`}
+                </div>
+            </div>
+        </div>
+    `).join("");
+
+    $("#notificationsList").html(html);
+    if (Number(window.__notificationSuppressedCount || 0) > 0) {
+        $("#notificationsList").append(
+            `<div class="list-group-item small text-muted">Older duplicate alerts hidden: ${window.__notificationSuppressedCount}</div>`
+        );
+    }
+}
+
+function renderFocusStatus(focus, data) {
+    if (!focus || !focus.course_title) {
+        $("#focusStatusCard").html('<div class="text-muted">Your risk and engagement summary will appear once course activity is available.</div>');
+        return;
+    }
+
+    const riskClass = riskBadge(focus.risk_level);
+    const html = `
+        <div class="awareness-card p-3">
+            <div class="small text-primary fw-semibold mb-1">Your status right now</div>
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="fw-semibold fs-5 mb-1">${focus.risk_level} risk in ${focus.course_title}</div>
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="showExplainability(encodeURIComponent(JSON.stringify(${JSON.stringify(focus)})))">Explain</button>
+                </div>
+            </div>
+            <div class="small text-muted">${focus.summary_message || "Keep working through your next lesson to stay on track."}</div>
+        </div>
+        <div class="row g-2 mt-2">
+            <div class="col-6">
+                <div class="awareness-stat">
+                    <div class="awareness-stat-label">Risk Score</div>
+                    <div class="awareness-stat-value">${Number(focus.risk_score_pct || 0).toFixed(1)}%</div>
+                    <span class="badge ${riskClass} mt-2">${focus.risk_level}</span>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="awareness-stat">
+                    <div class="awareness-stat-label">Engagement</div>
+                    <div class="awareness-stat-value">${focus.engagement_level || (data.overall_engagement_level || "UNKNOWN")}</div>
+                    <div class="small text-muted mt-2">${Number(focus.engagement_score_pct || data.overall_engagement_score_pct || 0).toFixed(1)}%</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="awareness-stat">
+                    <div class="awareness-stat-label">Last Activity</div>
+                    <div class="awareness-stat-value">${Number(focus.days_inactive_count || 0) === 0 ? "Today" : `${focus.days_inactive_count} day(s)`}</div>
+                    <div class="small text-muted mt-2">Away from your course workspace</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="awareness-stat">
+                    <div class="awareness-stat-label">Assessments Waiting</div>
+                    <div class="awareness-stat-value">${focus.pending_assessments_count || 0}</div>
+                    <div class="small text-muted mt-2">${focus.failed_attempts_count || 0} attempt(s) need review</div>
+                </div>
+            </div>
+        </div>
+        <div class="small text-muted mt-3 mb-2">Main issue: ${focus.primary_factor || "Unknown"}</div>
+        <div class="border rounded p-2 bg-light-subtle small">
+            ${focus.next_lesson ? `Next lesson: <strong>${focus.next_lesson.title}</strong>` : `No pending lesson right now.`}
+        </div>
+        <div class="border rounded p-2 bg-warning-subtle small mt-2">
+            <strong>Best next step:</strong> ${focus.next_action || "Open your priority course and complete one lesson."}
+        </div>
+        <div class="mt-3 d-flex gap-2 flex-wrap">
+            <a href="${focus.course_url || '#'}" class="btn btn-sm btn-primary">Open Priority Course</a>
+            ${focus.next_lesson && focus.next_lesson.open_url ? `<a href="${focus.next_lesson.open_url}" class="btn btn-sm btn-outline-secondary">Open Next Lesson</a>` : ``}
+        </div>
+    `;
+    $("#focusStatusCard").html(html);
+}
+
+function renderNextSteps(data) {
+    let steps = data.next_steps || [];
+    if (!steps.length) {
+        const courses = data.courses || [];
+        if (!courses.length) {
+            steps = ["Enroll in a course to begin your learning journey."];
+        } else {
+            const pending = courses.find(c => c.next_lesson);
+            if (pending) steps.push(`Continue "${pending.next_lesson.title}" in ${pending.course_title}.`);
+            if (!(data.performance_trend || []).length) {
+                steps.push("Take a quiz to generate performance insights.");
+            }
+            if (!steps.length) {
+                steps.push("Keep your momentum: complete one lesson today.");
+            }
+        }
+    }
+
+    $("#nextSteps").html(steps.map(step => `<li class="mb-2">${step}</li>`).join(""));
+}
+
+function reportDifficulty(courseId, lessonId = null) {
+    const reason = prompt("Please describe the difficulty you're facing:");
+    if (!reason) return;
+    $.ajax({
+        url: "{% url 'student_api' %}",
+        method: "POST",
+        contentType: "application/json",
+        headers: { "X-CSRFToken": getCSRFToken() },
+        data: JSON.stringify({
+            action: "report_difficulty",
+            course_id: courseId,
+            lesson_id: lessonId,
+            reason: reason
+        }),
+        success: function() {
+            alert("Difficulty reported successfully. Your teacher has been notified.");
+            loadStudentDashboard();
+        },
+        error: function(xhr) {
+            alert("Failed to report difficulty. Please try again.");
+            console.error("Report difficulty failed:", xhr.responseText || xhr.statusText);
+        }
+    });
+}
+
+function getCSRFToken() {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, 10) === 'csrftoken=') {
+                cookieValue = decodeURIComponent(cookie.substring(10));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showExplainability(encoded) {
+        try {
+                const focus = JSON.parse(decodeURIComponent(encoded || ''));
+                const modalBody = document.getElementById('explainModalBody');
+                if (!modalBody) return;
+                const factors = focus.explainability || focus.factors || {};
+                const rows = Object.keys(factors).length ? Object.keys(factors).map(k => `<div class="mb-2"><strong>${k}</strong>: ${factors[k]}</div>`).join('') : '<div class="text-muted">No further details available.</div>';
+                modalBody.innerHTML = `
+                        <div class="small text-muted mb-2">Risk score: ${Number(focus.risk_score_pct || 0).toFixed(1)}%</div>
+                        ${rows}
+                        <hr/>
+                        <div class="small text-muted">Primary factor: ${focus.primary_factor || 'Unknown'}</div>
+                `;
+                const modalEl = document.getElementById('explainModal');
+                const bsModal = new bootstrap.Modal(modalEl);
+                bsModal.show();
+        } catch (err) {
+                console.error('Show explainability failed', err);
+        }
+}
+</script>
+
+<!-- Explainability modal -->
+<div class="modal fade" id="explainModal" tabindex="-1" aria-labelledby="explainModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="explainModalLabel">Why this risk score?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="explainModalBody">
+                <div class="text-muted">Loading details...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

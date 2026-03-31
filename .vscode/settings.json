@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^python manage\\.py check$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

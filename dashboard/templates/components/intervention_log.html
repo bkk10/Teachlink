@@ -1,0 +1,515 @@
+{% comment %}
+Intervention Log Component
+Track teacher interventions and their impact on student risk
+{% endcomment %}
+
+<div class="intervention-panel">
+    <!-- Log Intervention Form -->
+    <div class="intervention-form-section">
+        <h3><i class="fas fa-hand-paper"></i> Log Intervention</h3>
+        
+        <form id="form-log-intervention" class="intervention-form">
+            {% csrf_token %}
+            <input type="hidden" name="enrollment_id" value="{{ enrollment.id }}">
+            
+            <div class="form-group">
+                <label for="intervention-student">Student</label>
+                <input type="text" id="intervention-student" class="form-control" value="{{ enrollment.student.display_name }}" disabled>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="intervention-type">Action Type *</label>
+                    <select id="intervention-type" name="intervention_type" class="form-select" required>
+                        <option value="">Select action...</option>
+                        <option value="EMAIL">Email sent</option>
+                        <option value="CALL">Phone call</option>
+                        <option value="TUTORING">Tutoring session</option>
+                        <option value="EXTRA_CREDIT">Extra credit assigned</option>
+                        <option value="ASSIGNMENT_MODIFIED">Assignment modified</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group col-md-6">
+                    <label for="intervention-outcome">Outcome *</label>
+                    <select id="intervention-outcome" name="outcome" class="form-select" required>
+                        <option value="">Select outcome...</option>
+                        <option value="IMPROVED">Risk improved</option>
+                        <option value="STABLE">Risk stable</option>
+                        <option value="WORSENED">Risk worsened</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="intervention-notes">Notes</label>
+                <textarea id="intervention-notes" name="notes" class="form-control" rows="3" placeholder="What happened during this intervention?"></textarea>
+            </div>
+            
+            <div class="risk-summary">
+                <div class="risk-before">
+                    <span class="label">Current Risk:</span>
+                    <span class="value badge risk-{{ enrollment.risk_level|lower }}">
+                        {{ enrollment.risk_level }} ({{ enrollment.risk_score|floatformat:2 }})
+                    </span>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save"></i> Save Intervention
+            </button>
+        </form>
+    </div>
+    
+    <!-- Intervention Timeline -->
+    <div class="intervention-timeline-section">
+        <h3><i class="fas fa-history"></i> Intervention History</h3>
+        
+        {% if interventions %}
+            <div class="timeline">
+                {% for intervention in interventions %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker">
+                            <i class="fas {% if intervention.intervention_type == 'EMAIL' %}fa-envelope{% elif intervention.intervention_type == 'CALL' %}fa-phone{% elif intervention.intervention_type == 'TUTORING' %}fa-book{% elif intervention.intervention_type == 'EXTRA_CREDIT' %}fa-star{% else %}fa-circle{% endif %}"></i>
+                        </div>
+                        
+                        <div class="timeline-content">
+                            <div class="timeline-header">
+                                <span class="intervention-type">
+                                    <span class="badge intervention-{{ intervention.intervention_type|lower }}">
+                                        {{ intervention.get_intervention_type_display }}
+                                    </span>
+                                </span>
+                                <span class="intervention-date">{{ intervention.created_at|date:"M d, Y g:i A" }}</span>
+                            </div>
+                            
+                            <p class="timeline-notes">{{ intervention.notes }}</p>
+                            
+                            <div class="timeline-outcome">
+                                <span class="outcome-label">Outcome:</span>
+                                <span class="badge outcome-{{ intervention.outcome|lower }}">
+                                    {{ intervention.get_outcome_display }}
+                                </span>
+                            </div>
+                            
+                            <div class="timeline-risk">
+                                <div class="risk-change">
+                                    <span class="risk-label">Risk Change:</span>
+                                    {% with delta=intervention.risk_after|add:"-"|add:intervention.risk_before %}
+                                        <span class="risk-value {% if delta < 0 %}improved{% elif delta > 0 %}worsened{% else %}stable{% endif %}">
+                                            {% if delta < 0 %}
+                                                <i class="fas fa-arrow-down"></i> {{ delta|floatformat:2 }}
+                                            {% elif delta > 0 %}
+                                                <i class="fas fa-arrow-up"></i> +{{ delta|floatformat:2 }}
+                                            {% else %}
+                                                <i class="fas fa-minus"></i> No change
+                                            {% endif %}
+                                        </span>
+                                    {% endwith %}
+                                </div>
+                                
+                                <div class="risk-range">
+                                    <span class="from-risk badge risk-{{ intervention.risk_before|risk_level|lower }}">
+                                        {{ intervention.risk_before|floatformat:2 }}
+                                    </span>
+                                    <span class="arrow"><i class="fas fa-arrow-right"></i></span>
+                                    <span class="to-risk badge risk-{{ intervention.risk_after|risk_level|lower }}">
+                                        {{ intervention.risk_after|floatformat:2 }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>No interventions logged yet</p>
+                <small class="text-muted">Start logging interventions to track your impact</small>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.intervention-panel {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.intervention-form-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.75rem;
+}
+
+.intervention-form-section h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: #0369a1;
+}
+
+.intervention-form {
+    max-width: 100%;
+}
+
+.intervention-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.intervention-form label {
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.intervention-form .form-control,
+.intervention-form .form-select {
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.95rem;
+}
+
+.intervention-form .form-control:focus,
+.intervention-form .form-select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.form-group.col-md-6 {
+    margin-bottom: 0;
+}
+
+.risk-summary {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    margin: 1.5rem 0;
+}
+
+.risk-before,
+.risk-after {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.risk-summary .label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #374151;
+}
+
+.intervention-timeline-section {
+    margin-top: 2rem;
+}
+
+.intervention-timeline-section h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: #0f172a;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 1rem;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #3b82f6, #10b981);
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -1.75rem;
+    top: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: white;
+    border: 3px solid #3b82f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3b82f6;
+    font-size: 1rem;
+    z-index: 10;
+}
+
+.timeline-content {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.intervention-type {
+    display: inline-block;
+}
+
+.intervention-date {
+    font-size: 0.85rem;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.badge.intervention-email {
+    background: #dbeafe;
+    color: #0369a1;
+}
+
+.badge.intervention-call {
+    background: #bfdbfe;
+    color: #0369a1;
+}
+
+.badge.intervention-tutoring {
+    background: #ddd6fe;
+    color: #4338ca;
+}
+
+.badge.intervention-extra_credit {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge.intervention-assignment_modified {
+    background: #e0e7ff;
+    color: #4338ca;
+}
+
+.badge.intervention-other {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.timeline-notes {
+    margin: 0.75rem 0;
+    color: #0f172a;
+    line-height: 1.5;
+}
+
+.timeline-outcome {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+    font-size: 0.9rem;
+}
+
+.outcome-label {
+    font-weight: 600;
+    color: #374151;
+}
+
+.badge.outcome-improved {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.badge.outcome-stable {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge.outcome-worsened {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.timeline-risk {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.risk-change {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.risk-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #374151;
+}
+
+.risk-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.risk-value.improved {
+    color: #16a34a;
+}
+
+.risk-value.worsened {
+    color: #dc2626;
+}
+
+.risk-value.stable {
+    color: #b45309;
+}
+
+.risk-range {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.risk-range .badge {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.risk-range .arrow {
+    color: #d1d5db;
+    font-size: 1rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 2.5rem;
+    color: #d1d5db;
+    margin-bottom: 0.75rem;
+}
+
+.empty-state p {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state small {
+    font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+    .timeline {
+        padding-left: 1rem;
+    }
+
+    .timeline::before {
+        left: 0.25rem;
+    }
+
+    .timeline-marker {
+        left: -1.25rem;
+        width: 1.5rem;
+        height: 1.5rem;
+        border-width: 2px;
+        font-size: 0.8rem;
+    }
+
+    .timeline-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .risk-change {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('form-log-intervention');
+    
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            
+            // Submit via AJAX
+            fetch('{% url "api_log_intervention" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success toast
+                    showToast('Intervention logged successfully', 'success');
+                    // Reset form
+                    form.reset();
+                    // Refresh interventions list (if needed)
+                    location.reload();
+                } else {
+                    showToast('Error logging intervention', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error logging intervention', 'error');
+            });
+        });
+    }
+});
+
+function showToast(message, type) {
+    // Implement toast notification
+    console.log(`[${type}] ${message}`);
+}
+</script>

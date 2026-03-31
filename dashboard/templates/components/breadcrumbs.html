@@ -1,0 +1,81 @@
+{# Breadcrumb Navigation Component #}
+{# Usage in parent template: #}
+{# {% include "components/breadcrumbs.html" with breadcrumbs=breadcrumb_list %} #}
+{# breadcrumb_list should be: [{"label": "My Courses", "url": "/courses/"}, {"label": "Demo Course", "url": "/courses/1/"}, {"label": "Lessons", "active": True}] #}
+
+<style>
+    .breadcrumb-container {
+        background-color: #f8f9fa;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 24px;
+        font-size: 13px;
+    }
+
+    .breadcrumb-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .breadcrumb-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .breadcrumb-item a {
+        color: #0066cc;
+        text-decoration: none;
+        transition: color 0.2s;
+    }
+
+    .breadcrumb-item a:hover {
+        color: #0052a3;
+        text-decoration: underline;
+    }
+
+    .breadcrumb-item.active {
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .breadcrumb-separator {
+        color: #adb5bd;
+        font-weight: 300;
+    }
+
+    @media (max-width: 768px) {
+        .breadcrumb-container {
+            padding: 10px 12px;
+            margin-bottom: 16px;
+            font-size: 12px;
+        }
+
+        .breadcrumb-list {
+            gap: 6px;
+        }
+    }
+</style>
+
+<nav class="breadcrumb-container" aria-label="breadcrumb">
+    <ol class="breadcrumb-list">
+        {% for item in breadcrumbs %}
+            <li class="breadcrumb-item {% if item.active %}active{% endif %}">
+                {% if not item.active %}
+                    <a href="{{ item.url }}" title="{{ item.label }}">
+                        {{ item.label }}
+                    </a>
+                    {% if not forloop.last %}
+                        <span class="breadcrumb-separator">/</span>
+                    {% endif %}
+                {% else %}
+                    <span>{{ item.label }}</span>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ol>
+</nav>

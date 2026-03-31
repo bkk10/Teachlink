@@ -1,0 +1,472 @@
+{# Competency Performance Heatmap Component #}
+{# Phase 2: Per-Competency Analytics #}
+{# Usage: {% include "components/competency_heatmap.html" with competency_data=competency_performance %} #}
+
+<style>
+    .competency-heatmap-container {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+
+    .heatmap-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #f0f0f0;
+    }
+
+    .heatmap-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .heatmap-controls {
+        display: flex;
+        gap: 12px;
+    }
+
+    .heatmap-filter {
+        padding: 8px 12px;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
+
+    .heatmap-filter:hover {
+        border-color: #0066cc;
+        background: #f0f4ff;
+    }
+
+    .heatmap-filter.active {
+        background: #0066cc;
+        color: white;
+        border-color: #0066cc;
+    }
+
+    .heatmap-legend {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 20px;
+        font-size: 13px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .legend-color {
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    .heatmap-table-wrapper {
+        overflow-x: auto;
+    }
+
+    .heatmap-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    .heatmap-table thead {
+        background: #f8f9fa;
+    }
+
+    .heatmap-table th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #666;
+        border-bottom: 2px solid #e9ecef;
+    }
+
+    .heatmap-table td {
+        padding: 12px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .competency-name {
+        font-weight: 500;
+        color: #333;
+        min-width: 180px;
+    }
+
+    .competency-description {
+        font-size: 12px;
+        color: #666;
+        margin-top: 2px;
+    }
+
+    .heatmap-cell {
+        text-align: center;
+        position: relative;
+        min-width: 80px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .heatmap-cell:hover {
+        transform: scale(1.05);
+    }
+
+    .heatmap-score {
+        display: inline-block;
+        width: 100%;
+        padding: 8px;
+        border-radius: 4px;
+        font-weight: 600;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Color gradient for performance scores */
+    .score-90-plus { background: #10b981; }
+    .score-80-89 { background: #84cc16; }
+    .score-70-79 { background: #f59e0b; }
+    .score-60-69 { background: #f97316; }
+    .score-below-60 { background: #ef4444; }
+    .score-no-data { background: #d1d5db; color: #555; }
+
+    .score-tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+        margin-bottom: 8px;
+        z-index: 10;
+    }
+
+    .heatmap-cell:hover .score-tooltip {
+        opacity: 1;
+    }
+
+    .student-name {
+        font-weight: 500;
+        color: #333;
+        text-align: left;
+    }
+
+    .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 2px solid #f0f0f0;
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 16px;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .stat-card.warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+    }
+
+    .stat-card.success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .stat-label {
+        font-size: 12px;
+        font-weight: 600;
+        opacity: 0.9;
+        text-transform: uppercase;
+    }
+
+    .stat-value {
+        font-size: 24px;
+        font-weight: 700;
+        margin-top: 8px;
+    }
+
+    .comparison-row {
+        background: #f0f4ff;
+        border: 1px solid #e0e7ff;
+        padding: 12px;
+        border-radius: 6px;
+        margin-top: 12px;
+        font-size: 13px;
+    }
+
+    .comparison-row strong {
+        color: #667eea;
+    }
+
+    .row-highlight {
+        background: #fff3cd;
+        border: 1px solid #ffe69c;
+    }
+
+    @media (max-width: 768px) {
+        .heatmap-container {
+            padding: 16px;
+        }
+
+        .heatmap-legend {
+            flex-wrap: wrap;
+        }
+
+        .heatmap-table {
+            font-size: 12px;
+        }
+
+        .heatmap-table th,
+        .heatmap-table td {
+            padding: 8px;
+        }
+
+        .summary-stats {
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+        }
+    }
+</style>
+
+<div class="competency-heatmap-container">
+    <div class="heatmap-header">
+        <div>
+            <h3 class="heatmap-title">📊 Competency Performance Matrix</h3>
+            <p style="font-size: 12px; color: #666; margin-top: 4px;">Student performance across course competencies</p>
+        </div>
+        <div class="heatmap-controls">
+            <select class="heatmap-filter" id="competency-filter">
+                <option value="">All Competencies</option>
+                <option value="high">High Difficulty</option>
+                <option value="low">Low Difficulty</option>
+            </select>
+            <button class="heatmap-filter" onclick="downloadHeatmap()">📥 Export</button>
+        </div>
+    </div>
+
+    <div class="heatmap-legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #10b981;">90%</div>
+            <span>90+ (Mastery)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #84cc16;">80%</div>
+            <span>80-89 (Proficient)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f59e0b;">70%</div>
+            <span>70-79 (Developing)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f97316;">60%</div>
+            <span>60-69 (Needs Work)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ef4444;">-</div>
+            <span>&lt;60 (At Risk)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #d1d5db; color: #555;">—</div>
+            <span>No Data</span>
+        </div>
+    </div>
+
+    <div class="heatmap-table-wrapper">
+        <table class="heatmap-table" id="heatmap-table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th colspan="6" style="text-align: center;">Competency Scores</th>
+                    <th>Avg Score</th>
+                    <th>Status</th>
+                </tr>
+                <tr>
+                    <th>Name</th>
+                    <th class="heatmap-cell" data-competency="communication">Communication</th>
+                    <th class="heatmap-cell" data-competency="critical-thinking">Critical Thinking</th>
+                    <th class="heatmap-cell" data-competency="collaboration">Collaboration</th>
+                    <th class="heatmap-cell" data-competency="creativity">Creativity</th>
+                    <th class="heatmap-cell" data-competency="technical">Technical Skills</th>
+                    <th class="heatmap-cell" data-competency="problem-solving">Problem Solving</th>
+                    <th>Avg</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="heatmap-tbody">
+                <!-- Populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="summary-stats">
+        <div class="stat-card">
+            <div class="stat-label">Class Average</div>
+            <div class="stat-value"><span id="class-avg">78</span>%</div>
+        </div>
+        <div class="stat-card success">
+            <div class="stat-label">Mastery Count</div>
+            <div class="stat-value"><span id="mastery-count">4</span></div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-label">At Risk</div>
+            <div class="stat-value"><span id="at-risk-count">2</span></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Most Challenging</div>
+            <div class="stat-value" id="challenging-competency">Problem Solving</div>
+        </div>
+    </div>
+
+    <div class="comparison-row">
+        <strong>💡 Insight:</strong> <span id="heatmap-insight">Students struggle most with "Problem Solving" competency (avg 68%). Consider additional scaffolding activities.</span>
+    </div>
+</div>
+
+<script>
+    const sampleData = [
+        {
+            name: 'Alice Johnson',
+            scores: { communication: 92, 'critical-thinking': 85, collaboration: 88, creativity: 80, technical: 87, 'problem-solving': 75 },
+            status: 'on-track'
+        },
+        {
+            name: 'Bob Smith',
+            scores: { communication: 78, 'critical-thinking': 72, collaboration: 82, creativity: 68, technical: 75, 'problem-solving': 65 },
+            status: 'at-risk'
+        },
+        {
+            name: 'Carol White',
+            scores: { communication: 88, 'critical-thinking': 91, collaboration: 86, creativity: 89, technical: 92, 'problem-solving': 88 },
+            status: 'mastery'
+        },
+        {
+            name: 'David Lee',
+            scores: { communication: 70, 'critical-thinking': 65, collaboration: 72, creativity: 60, technical: 68, 'problem-solving': 62 },
+            status: 'at-risk'
+        },
+        {
+            name: 'Emma Davis',
+            scores: { communication: 85, 'critical-thinking': 88, collaboration: 90, creativity: 84, technical: 86, 'problem-solving': 82 },
+            status: 'on-track'
+        }
+    ];
+
+    const competencies = ['communication', 'critical-thinking', 'collaboration', 'creativity', 'technical', 'problem-solving'];
+
+    function getScoreClass(score) {
+        if (score === null) return 'score-no-data';
+        if (score >= 90) return 'score-90-plus';
+        if (score >= 80) return 'score-80-89';
+        if (score >= 70) return 'score-70-79';
+        if (score >= 60) return 'score-60-69';
+        return 'score-below-60';
+    }
+
+    function getStatusBadge(status) {
+        const badges = {
+            'on-track': '<span style="background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">✓ On Track</span>',
+            'at-risk': '<span style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">⚠ At Risk</span>',
+            'mastery': '<span style="background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">★ Mastery</span>'
+        };
+        return badges[status] || '';
+    }
+
+    function renderHeatmap() {
+        const tbody = document.getElementById('heatmap-tbody');
+        tbody.innerHTML = sampleData.map(student => {
+            const avgScore = competencies.reduce((sum, comp) => sum + (student.scores[comp] || 0), 0) / competencies.length;
+            return `
+                <tr>
+                    <td class="student-name">${student.name}</td>
+                    ${competencies.map(comp => `
+                        <td class="heatmap-cell">
+                            <div class="heatmap-score ${getScoreClass(student.scores[comp])}">
+                                <div class="score-tooltip">${student.scores[comp] || 'N/A'}%</div>
+                                ${student.scores[comp] || '—'}
+                            </div>
+                        </td>
+                    `).join('')}
+                    <td style="text-align: center; font-weight: 600; color: #333;">${Math.round(avgScore)}%</td>
+                    <td>${getStatusBadge(student.status)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        updateSummaryStats();
+    }
+
+    function updateSummaryStats() {
+        const allScores = sampleData.flatMap(s => Object.values(s.scores)).filter(s => s !== null);
+        const classAvg = Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length);
+        const masteryCount = sampleData.filter(s => Object.values(s.scores).every(score => score >= 90)).length;
+        const atRiskCount = sampleData.filter(s => Object.values(s.scores).some(score => score < 70)).length;
+
+        const competencyAvgs = {};
+        competencies.forEach(comp => {
+            const scores = sampleData.map(s => s.scores[comp]).filter(s => s !== null);
+            competencyAvgs[comp] = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        });
+
+        const mostChallenging = Object.entries(competencyAvgs).reduce((min, [comp, avg]) => avg < min[1] ? [comp, avg] : min);
+
+        document.getElementById('class-avg').textContent = classAvg;
+        document.getElementById('mastery-count').textContent = masteryCount;
+        document.getElementById('at-risk-count').textContent = atRiskCount;
+        document.getElementById('challenging-competency').textContent = mostChallenging[0].replace('-', ' ').toUpperCase();
+        document.getElementById('heatmap-insight').textContent = 
+            `Students struggle most with "${mostChallenging[0].replace('-', ' ')}" competency (avg ${mostChallenging[1]}%). Consider additional scaffolding activities.`;
+    }
+
+    function downloadHeatmap() {
+        // Convert table to CSV and download
+        const table = document.getElementById('heatmap-table');
+        let csv = [];
+        for (let row of table.rows) {
+            let csvRow = [];
+            for (let cell of row.cells) {
+                csvRow.push(cell.textContent.trim());
+            }
+            csv.push(csvRow.join(','));
+        }
+
+        const link = document.createElement('a');
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv.join('\n'));
+        link.download = 'competency_heatmap.csv';
+        link.click();
+
+        toastNotify('Heatmap exported as CSV', 'success');
+    }
+
+    // Initialize
+    renderHeatmap();
+</script>

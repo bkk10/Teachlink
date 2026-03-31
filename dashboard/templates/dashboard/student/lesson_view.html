@@ -1,0 +1,177 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Lesson{% endblock %}
+
+{% block extra_css %}
+<style>
+    .lesson-shell {
+        border: 1px solid #dbeafe;
+        border-radius: 1rem;
+        background: linear-gradient(135deg, #f8fbff 0%, #eef5ff 100%);
+    }
+    .lesson-card {
+        border: 0;
+        border-radius: 0.9rem;
+        box-shadow: 0 0.45rem 1rem rgba(2, 6, 23, 0.08);
+    }
+    .lesson-copy {
+        font-size: 1rem;
+        line-height: 1.7;
+        color: #0f172a;
+        white-space: pre-wrap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="small text-muted mb-3">
+        <a href="{% url 'student_dashboard' %}" class="text-decoration-none">Overview</a>
+        <span class="mx-1">/</span>
+        <a href="{{ course_back_url }}" class="text-decoration-none">{{ course.title }}</a>
+        <span class="mx-1">/</span>
+        <span>{{ lesson.title }}</span>
+    </div>
+
+    <section class="lesson-shell p-4 p-md-5 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <p class="text-uppercase small fw-semibold text-primary mb-2">Lesson</p>
+                <h2 class="fw-bold mb-1">{{ lesson.title }}</h2>
+                <p class="text-muted mb-2">{{ course.title }} - {{ lesson.module.title }}</p>
+                <div class="small text-muted">Estimated time: {{ lesson.estimated_minutes }} minute(s)</div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ course_back_url }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Course
+                </a>
+                {% if quiz and quiz_available %}
+                <a href="{% url 'student_quiz_attempts' quiz.id %}?take=1" class="btn btn-primary btn-sm">
+                    <i class="fas fa-pen me-1"></i>Open Quiz
+                </a>
+                {% elif quiz and not quiz_available %}
+                <button class="btn btn-outline-secondary btn-sm" disabled>
+                    <i class="fas fa-lock me-1"></i>Quiz Not Published
+                </button>
+                {% endif %}
+                <button id="markCompleteBtn" class="btn {% if completed %}btn-success{% else %}btn-outline-success{% endif %} btn-sm" data-lesson-id="{{ lesson.id }}">
+                    <i class="fas fa-check me-1"></i>{% if completed %}Completed{% else %}Mark Complete{% endif %}
+                </button>
+                <button id="reportDifficultyBtn" class="btn btn-outline-warning btn-sm" data-course-id="{{ course.id }}" data-lesson-id="{{ lesson.id }}">
+                    <i class="fas fa-flag me-1"></i>Report Difficulty
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <article class="card lesson-card">
+        <div class="card-body">
+            {% if lesson.video_url %}
+            <div class="mb-3">
+                <div class="small text-muted mb-2">Video lesson</div>
+                <a href="{{ lesson.video_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-play-circle me-1"></i>Open Video
+                </a>
+            </div>
+            {% endif %}
+
+            {% if lesson.external_url %}
+            <div class="mb-3">
+                <div class="small text-muted mb-2">External resource</div>
+                <a href="{{ lesson.external_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-up-right-from-square me-1"></i>Open Resource
+                </a>
+            </div>
+            {% endif %}
+
+            {% if lesson.resource_file %}
+            <div class="mb-3">
+                <div class="small text-muted mb-2">Attached file</div>
+                <a href="{{ lesson.resource_file.url }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-file-arrow-down me-1"></i>Open File
+                </a>
+            </div>
+            {% endif %}
+
+            {% if lesson.content_text %}
+            <div class="lesson-copy">{{ lesson.content_text|linebreaksbr }}</div>
+            {% else %}
+            <div class="text-muted">This lesson has no text body. Use the resource buttons above.</div>
+            {% endif %}
+        </div>
+    </article>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCSRFToken() {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, 10) === 'csrftoken=') {
+                cookieValue = decodeURIComponent(cookie.substring(10));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function reportDifficulty(courseId, lessonId) {
+    const reason = prompt("Please describe what feels difficult in this lesson:");
+    if (!reason) return;
+    $.ajax({
+        url: "{% url 'student_api' %}",
+        method: "POST",
+        contentType: "application/json",
+        headers: { "X-CSRFToken": getCSRFToken() },
+        data: JSON.stringify({
+            action: "report_difficulty",
+            course_id: courseId,
+            lesson_id: lessonId,
+            reason: reason
+        }),
+        success: function() {
+            alert("Difficulty report sent to your teacher.");
+        },
+        error: function(xhr) {
+            alert("Unable to submit report right now. Please try again.");
+            console.error(xhr.responseText || xhr.statusText);
+        }
+    });
+}
+
+$(function() {
+    $("#markCompleteBtn").on("click", function() {
+        const button = $(this);
+        const lessonId = button.data("lesson-id");
+        if (!lessonId) return;
+
+        $.ajax({
+            url: `/api/courses/lessons/${lessonId}/complete/`,
+            method: "POST",
+            contentType: "application/json",
+            headers: { "X-CSRFToken": getCSRFToken() },
+            data: JSON.stringify({}),
+            success: function() {
+                button.removeClass("btn-outline-success").addClass("btn-success");
+                button.html('<i class="fas fa-check me-1"></i>Completed');
+            },
+            error: function(xhr) {
+                alert("Could not mark lesson complete. Please retry.");
+                console.error(xhr.responseText || xhr.statusText);
+            }
+        });
+    });
+
+    $("#reportDifficultyBtn").on("click", function() {
+        const courseId = $(this).data("course-id");
+        const lessonId = $(this).data("lesson-id");
+        reportDifficulty(courseId, lessonId);
+    });
+});
+</script>
+{% endblock %}

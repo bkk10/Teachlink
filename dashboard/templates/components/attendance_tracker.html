@@ -1,0 +1,344 @@
+{% comment %}
+Attendance Tracking Component
+Allows teachers to log and view student attendance
+{% endcomment %}
+
+<div class="attendance-panel">
+    <!-- Attendance Summary -->
+    <div class="attendance-summary">
+        <h3><i class="fas fa-clipboard-check"></i> Attendance Summary</h3>
+        <div class="summary-stats">
+            <div class="stat-card">
+                <span class="stat-label">Session Date</span>
+                <span class="stat-value">{{ session_date|date:"M d, Y" }}</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Total Present</span>
+                <span class="stat-value text-success">{{ present_count }}/{{ total_students }}</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Attendance Rate</span>
+                <span class="stat-value">{{ attendance_rate|floatformat:0 }}%</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Log Attendance Form -->
+    <div class="attendance-form">
+        <h4>Log Today's Attendance</h4>
+        <form id="form-attendance" method="post" action="{% url 'api_attendance_log' %}">
+            {% csrf_token %}
+            <input type="hidden" name="course_id" value="{{ course.id }}">
+            <input type="hidden" name="session_date" value="{% now "Y-m-d" %}">
+            
+            <div class="attendance-checklist">
+                {% for student in students %}
+                    <div class="attendance-item">
+                        <div class="student-info">
+                            <div class="student-avatar">{{ student.first_name|first }}{{ student.last_name|first }}</div>
+                            <span class="student-name">{{ student.display_name }}</span>
+                        </div>
+                        <div class="attendance-status">
+                            <label class="status-option">
+                                <input type="radio" name="attendance_{{ student.id }}" value="PRESENT" class="attendance-radio">
+                                <span class="status-badge status-present">
+                                    <i class="fas fa-check"></i> Present
+                                </span>
+                            </label>
+                            <label class="status-option">
+                                <input type="radio" name="attendance_{{ student.id }}" value="LATE" class="attendance-radio">
+                                <span class="status-badge status-late">
+                                    <i class="fas fa-clock"></i> Late
+                                </span>
+                            </label>
+                            <label class="status-option">
+                                <input type="radio" name="attendance_{{ student.id }}" value="ABSENT" class="attendance-radio">
+                                <span class="status-badge status-absent">
+                                    <i class="fas fa-times"></i> Absent
+                                </span>
+                            </label>
+                            <label class="status-option">
+                                <input type="radio" name="attendance_{{ student.id }}" value="EXCUSED" class="attendance-radio">
+                                <span class="status-badge status-excused">
+                                    <i class="fas fa-clipboard"></i> Excused
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save"></i> Save Attendance
+            </button>
+        </form>
+    </div>
+    
+    <!-- Attendance History -->
+    <div class="attendance-history">
+        <h4>Attendance History</h4>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Student</th>
+                        <th>Status</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in attendance_records %}
+                        <tr>
+                            <td>{{ record.session_date|date:"M d, Y" }}</td>
+                            <td>{{ record.student.display_name }}</td>
+                            <td>
+                                <span class="badge status-{{ record.status|lower }}">
+                                    {{ record.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if record.notes %}
+                                    <small class="text-muted">{{ record.notes }}</small>
+                                {% else %}
+                                    <small class="text-muted text-secondary">-</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">No attendance records yet</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.attendance-panel {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.attendance-summary {
+    margin-bottom: 2rem;
+}
+
+.attendance-summary h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #0f172a;
+}
+
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #f9fafb;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.stat-value.text-success {
+    color: #16a34a;
+}
+
+.attendance-form {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 0.75rem;
+}
+
+.attendance-form h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #166534;
+}
+
+.attendance-checklist {
+    margin-bottom: 1.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.attendance-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.attendance-item:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.student-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.student-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.student-name {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.attendance-status {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.status-option {
+    display: inline-block;
+}
+
+.status-option input[type="radio"] {
+    display: none;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.75rem;
+    border: 2px solid transparent;
+    border-radius: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.status-badge.status-present {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.status-badge.status-late {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge.status-absent {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-badge.status-excused {
+    background: #e0e7ff;
+    color: #4338ca;
+}
+
+.status-option input[type="radio"]:checked + .status-badge {
+    border-color: currentColor;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.attendance-history {
+    margin-top: 2rem;
+}
+
+.attendance-history h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #0f172a;
+}
+
+.attendance-history .table {
+    margin-bottom: 0;
+}
+
+.attendance-history .table thead th {
+    background: #f3f4f6;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.badge.status-present {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.badge.status-late {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge.status-absent {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.badge.status-excused {
+    background: #e0e7ff;
+    color: #4338ca;
+}
+
+@media (max-width: 768px) {
+    .attendance-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .attendance-status {
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+
+    .summary-stats {
+        grid-template-columns: 1fr;
+    }
+}
+</style>

@@ -1,0 +1,395 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-shell {
+        width: 100%;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 1.25rem 0.25rem 2rem;
+    }
+
+    .profile-stats-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .profile-settings-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    @media (min-width: 768px) {
+        .profile-shell {
+            padding-top: 1.5rem;
+        }
+
+        .profile-stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 1200px) {
+        .profile-stats-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .profile-settings-grid {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-shell">
+    <!-- Messages -->
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="rounded-md p-4 {% if message.tags == 'success' %}bg-green-50 border border-green-200{% else %}bg-red-50 border border-red-200{% endif %}">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            {% if message.tags == 'success' %}
+                                <i class="fas fa-check-circle text-green-400"></i>
+                            {% else %}
+                                <i class="fas fa-exclamation-circle text-red-400"></i>
+                            {% endif %}
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium {% if message.tags == 'success' %}text-green-800{% else %}text-red-800{% endif %}">
+                                {{ message }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- Profile Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-800 h-32"></div>
+        <div class="px-6 pb-6">
+            <div class="flex flex-col sm:flex-row sm:items-end -mt-12">
+                <div class="flex-shrink-0">
+                    <div class="h-24 w-24 rounded-xl bg-white p-1 shadow-lg">
+                        {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="{{ user.display_name }}" class="h-full w-full rounded-lg object-cover">
+                        {% else %}
+                        <div class="h-full w-full rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                            <span class="text-3xl font-bold text-white">
+                                {{ user.display_name|first|upper }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mt-4 sm:mt-0 sm:ml-6 flex-1">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900">{{ user.display_name }}</h1>
+                            <p class="text-sm text-gray-500">{{ user.email }}</p>
+                        </div>
+                        <div class="mt-2 sm:mt-0">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                <i class="fas fa-user-tag mr-2"></i>
+                                {{ user.get_role_display }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="profile-stats-grid">
+        <!-- Member Since -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <i class="fas fa-calendar-alt text-blue-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Member Since</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ member_since|date:"M d, Y" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Last Login -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
+                        <i class="fas fa-clock text-green-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Last Login</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ last_login|date:"M d, Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+
+        {% if user.role == 'TEACHER' %}
+        <!-- Total Courses -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+                        <i class="fas fa-book text-purple-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Total Courses</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ teaching_courses }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Students -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
+                        <i class="fas fa-users text-orange-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Active Students</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ active_students }}</p>
+                </div>
+            </div>
+        </div>
+        {% elif user.role == 'STUDENT' %}
+        <!-- Active Courses -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+                        <i class="fas fa-book-open text-purple-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Active Courses</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ active_courses }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Average Progress -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
+                        <i class="fas fa-chart-line text-green-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Avg. Progress</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ average_progress|floatformat:1 }}%</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Active Alerts -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
+                        <i class="fas fa-bell text-red-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Active Alerts</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ active_alerts }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Sections -->
+    <div class="profile-settings-grid">
+        <!-- Profile Settings Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div class="flex items-center">
+                    <i class="fas fa-user-cog text-blue-600 mr-3"></i>
+                    <h2 class="text-lg font-semibold text-gray-900">Profile Information</h2>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">Update your personal information and bio</p>
+            </div>
+            
+            <form method="post" enctype="multipart/form-data" class="p-6">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="profile">
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-user text-gray-400 mr-2"></i>
+                            Display Name
+                        </label>
+                        <input type="text" name="display_name" value="{{ user.display_name }}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-envelope text-gray-400 mr-2"></i>
+                            Email Address
+                        </label>
+                        <input type="email" value="{{ user.email }}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                               readonly disabled>
+                        <p class="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-info-circle text-gray-400 mr-2"></i>
+                            Bio
+                        </label>
+                        <textarea name="bio" rows="4" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                  placeholder="Tell us a little about yourself...">{{ user.bio }}</textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-image text-gray-400 mr-2"></i>
+                            Avatar
+                        </label>
+                        <input type="file" name="avatar" accept=".png,.jpg,.jpeg,.gif,.webp"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Max 5MB. Supported: PNG, JPG, JPEG, GIF, WEBP.</p>
+                    </div>
+                    
+                    <div class="pt-4">
+                        <button type="submit" 
+                                class="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                            <i class="fas fa-save mr-2"></i>
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Security Settings Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div class="flex items-center">
+                    <i class="fas fa-shield-alt text-gray-700 mr-3"></i>
+                    <h2 class="text-lg font-semibold text-gray-900">Security Settings</h2>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">Update your password and security preferences</p>
+            </div>
+            
+            <form method="post" class="p-6">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="password">
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-lock text-gray-400 mr-2"></i>
+                            Current Password
+                        </label>
+                        <input id="old-password" type="password" name="old_password" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               required>
+                        <label class="mt-2 inline-flex items-center text-sm text-gray-600">
+                            <input type="checkbox" class="mr-2 show-password-toggle" data-target="old-password">
+                            Show password
+                        </label>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-key text-gray-400 mr-2"></i>
+                            New Password
+                        </label>
+                        <input id="new-password" type="password" name="new_password" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               required>
+                        <label class="mt-2 inline-flex items-center text-sm text-gray-600">
+                            <input type="checkbox" class="mr-2 show-password-toggle" data-target="new-password">
+                            Show password
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1">Minimum 8 characters with at least one number and one letter</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-check-circle text-gray-400 mr-2"></i>
+                            Confirm New Password
+                        </label>
+                        <input id="confirm-password" type="password" name="confirm_password" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               required>
+                        <label class="mt-2 inline-flex items-center text-sm text-gray-600">
+                            <input type="checkbox" class="mr-2 show-password-toggle" data-target="confirm-password">
+                            Show password
+                        </label>
+                    </div>
+                    
+                    <div class="pt-4">
+                        <button type="submit" 
+                                class="w-full sm:w-auto px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors">
+                            <i class="fas fa-sync-alt mr-2"></i>
+                            Update Password
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Additional Info for Teachers -->
+    {% if user.role == 'TEACHER' %}
+    <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">Quick Actions</h3>
+        <div class="flex flex-wrap gap-3">
+            <a href="{% url 'dashboard_courses' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                <i class="fas fa-plus-circle mr-2 text-green-600"></i>
+                Create New Course
+            </a>
+            <a href="{% url 'teacher_students' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                <i class="fas fa-user-plus mr-2 text-blue-600"></i>
+                Manage Students
+            </a>
+            <a href="{% url 'alerts_center' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                <i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>
+                View All Alerts
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('.show-password-toggle').forEach(function(toggle) {
+        toggle.addEventListener('change', function() {
+            var target = document.getElementById(toggle.dataset.target);
+            if (target) {
+                target.type = toggle.checked ? 'text' : 'password';
+            }
+        });
+    });
+</script>
+{% endblock %}

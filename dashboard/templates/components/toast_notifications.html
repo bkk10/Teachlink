@@ -1,0 +1,268 @@
+{# Toast Notification Container Component #}
+{# Usage: Add to base template or include in main layout #}
+{# JavaScript: toastNotify(message, type, duration) where type = "success"|"error"|"warning"|"info" #}
+
+<style>
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        pointer-events: none;
+    }
+
+    .toast {
+        background-color: white;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        margin-bottom: 12px;
+        padding: 16px;
+        min-width: 300px;
+        max-width: 500px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        animation: slideIn 0.3s ease-out;
+        pointer-events: auto;
+        border-left: 4px solid #ccc;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+    }
+
+    .toast.removing {
+        animation: slideOut 0.3s ease-in forwards;
+    }
+
+    .toast-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+
+    .toast-content {
+        flex-grow: 1;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    .toast-title {
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .toast-message {
+        color: #666;
+        font-size: 13px;
+    }
+
+    .toast-close {
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        font-size: 20px;
+        padding: 0;
+        flex-shrink: 0;
+        transition: color 0.2s;
+    }
+
+    .toast-close:hover {
+        color: #333;
+    }
+
+    /* Success Toast */
+    .toast.success {
+        border-left-color: #10b981;
+        background: linear-gradient(to right, rgba(16, 185, 129, 0.1), white);
+    }
+
+    .toast.success .toast-icon {
+        color: #10b981;
+    }
+
+    .toast.success .toast-title {
+        color: #059669;
+    }
+
+    /* Error Toast */
+    .toast.error {
+        border-left-color: #ef4444;
+        background: linear-gradient(to right, rgba(239, 68, 68, 0.1), white);
+    }
+
+    .toast.error .toast-icon {
+        color: #ef4444;
+    }
+
+    .toast.error .toast-title {
+        color: #dc2626;
+    }
+
+    /* Warning Toast */
+    .toast.warning {
+        border-left-color: #f59e0b;
+        background: linear-gradient(to right, rgba(245, 158, 11, 0.1), white);
+    }
+
+    .toast.warning .toast-icon {
+        color: #f59e0b;
+    }
+
+    .toast.warning .toast-title {
+        color: #d97706;
+    }
+
+    /* Info Toast */
+    .toast.info {
+        border-left-color: #3b82f6;
+        background: linear-gradient(to right, rgba(59, 130, 246, 0.1), white);
+    }
+
+    .toast.info .toast-icon {
+        color: #3b82f6;
+    }
+
+    .toast.info .toast-title {
+        color: #1d4ed8;
+    }
+
+    @media (max-width: 768px) {
+        .toast-container {
+            top: 10px;
+            right: 10px;
+            left: 10px;
+        }
+
+        .toast {
+            min-width: auto;
+            max-width: none;
+        }
+    }
+
+    .progress-bar-container {
+        height: 3px;
+        background-color: rgba(0, 0, 0, 0.1);
+        margin-top: 12px;
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background-color: currentColor;
+        animation: progress linear forwards;
+    }
+
+    @keyframes progress {
+        from {
+            width: 100%;
+        }
+        to {
+            width: 0%;
+        }
+    }
+</style>
+
+<div id="toast-container" class="toast-container"></div>
+
+<script>
+    function toastNotify(message, type = 'info', duration = 4000, title = null) {
+        const container = document.getElementById('toast-container');
+        
+        const icons = {
+            success: '✓',
+            error: '✕',
+            warning: '⚠',
+            info: 'ℹ'
+        };
+
+        const titles = {
+            success: title || 'Success',
+            error: title || 'Error',
+            warning: title || 'Warning',
+            info: title || 'Info'
+        };
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const progressDuration = duration;
+        toast.innerHTML = `
+            <div class="toast-icon">${icons[type] || icons.info}</div>
+            <div class="toast-content">
+                <div class="toast-title">${titles[type]}</div>
+                <div class="toast-message">${message}</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" style="color: ${getToastColor(type)}; animation-duration: ${duration}ms;"></div>
+                </div>
+            </div>
+            <button class="toast-close" aria-label="Close">×</button>
+        `;
+
+        container.appendChild(toast);
+
+        const closeBtn = toast.querySelector('.toast-close');
+        const removeToast = () => {
+            toast.classList.add('removing');
+            setTimeout(() => toast.remove(), 300);
+        };
+
+        closeBtn.addEventListener('click', removeToast);
+        setTimeout(removeToast, duration);
+
+        return toast;
+    }
+
+    function getToastColor(type) {
+        const colors = {
+            success: '#10b981',
+            error: '#ef4444',
+            warning: '#f59e0b',
+            info: '#3b82f6'
+        };
+        return colors[type] || colors.info;
+    }
+
+    // Global fetch interceptor for AJAX calls
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        return originalFetch.apply(this, args)
+            .then(response => {
+                if (!response.ok && response.status >= 400) {
+                    let errorMsg = `Error: ${response.status} ${response.statusText}`;
+                    toastNotify(errorMsg, 'error', 5000);
+                }
+                return response;
+            })
+            .catch(error => {
+                toastNotify('Network error. Please try again.', 'error', 5000);
+                throw error;
+            });
+    };
+
+    // Example usage in forms:
+    // form.addEventListener('submit', async (e) => {
+    //     e.preventDefault();
+    //     const response = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+    //     if (response.ok) toastNotify('Saved successfully', 'success');
+    // });
+</script>

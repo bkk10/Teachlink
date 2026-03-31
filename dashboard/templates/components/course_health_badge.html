@@ -1,0 +1,151 @@
+{% comment %}
+Course Health Badge Component
+Displays risk status with color coding
+Color scheme: RED (high risk), YELLOW (medium risk), GREEN (low risk)
+{% endcomment %}
+
+<div class="course-health-badge course-health-{{ health_status.status_color|lower }}">
+    <div class="health-header">
+        <span class="health-icon">
+            {% if health_status.status_color == 'RED' %}
+                <i class="fas fa-exclamation-circle"></i>
+            {% elif health_status.status_color == 'YELLOW' %}
+                <i class="fas fa-exclamation-triangle"></i>
+            {% else %}
+                <i class="fas fa-check-circle"></i>
+            {% endif %}
+        </span>
+        <span class="health-title">Course Health</span>
+    </div>
+    
+    <div class="health-stats">
+        {% if health_status.high_risk > 0 %}
+            <div class="health-stat high-risk">
+                <span class="stat-value">{{ health_status.high_risk }}</span>
+                <span class="stat-label">High Risk</span>
+            </div>
+        {% endif %}
+        
+        {% if health_status.medium_risk > 0 %}
+            <div class="health-stat medium-risk">
+                <span class="stat-value">{{ health_status.medium_risk }}</span>
+                <span class="stat-label">Medium Risk</span>
+            </div>
+        {% endif %}
+        
+        {% if health_status.low_risk > 0 %}
+            <div class="health-stat low-risk">
+                <span class="stat-value">{{ health_status.low_risk }}</span>
+                <span class="stat-label">Low Risk</span>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="health-footer">
+        <span class="total-at-risk">{{ health_status.total_at_risk }} at risk</span>
+    </div>
+</div>
+
+<style>
+.course-health-badge {
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border: 2px solid #d1d5db;
+    background: #f9fafb;
+}
+
+.course-health-badge.course-health-red {
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.course-health-badge.course-health-yellow {
+    border-color: #fcd34d;
+    background: #fffbeb;
+}
+
+.course-health-badge.course-health-green {
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+
+.health-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.health-icon {
+    font-size: 1.1rem;
+}
+
+.course-health-badge.course-health-red .health-icon {
+    color: #dc2626;
+}
+
+.course-health-badge.course-health-yellow .health-icon {
+    color: #d97706;
+}
+
+.course-health-badge.course-health-green .health-icon {
+    color: #16a34a;
+}
+
+.health-stats {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.health-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.3rem;
+    font-size: 0.8rem;
+}
+
+.health-stat.high-risk {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.health-stat.medium-risk {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.health-stat.low-risk {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.stat-value {
+    font-weight: 800;
+    font-size: 1.1rem;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.health-footer {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #6b7280;
+    padding-top: 0.25rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.total-at-risk {
+    font-weight: 600;
+}
+</style>

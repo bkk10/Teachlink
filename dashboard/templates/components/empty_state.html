@@ -1,0 +1,31 @@
+{% comment %}
+Reusable empty state component for displaying helpful messaging and CTAs when sections are empty.
+
+Usage:
+{% include "components/empty_state.html" with icon="fa-users" title="No students enrolled" message="Share your course link to get started" %}
+
+Or with action button:
+{% include "components/empty_state.html" with icon="fa-book" title="No courses created" message="Create your first course to get started" action_url="/teacher/courses/new/" action_text="Create First Course" %}
+
+Parameters:
+- icon: Font Awesome icon class (e.g., 'fa-users', 'fa-book', 'fa-clipboard')
+- title: Main heading text
+- message: Descriptive message
+- action_url: (optional) URL for the CTA button
+- action_text: (optional) Button text for the CTA
+{% endcomment %}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body text-center py-5">
+        {% if icon %}
+        <i class="fas {{ icon }} fs-1 text-secondary mb-3"></i>
+        {% endif %}
+        <h5 class="fw-bold mb-2">{{ title }}</h5>
+        <p class="text-muted mb-3">{{ message }}</p>
+        {% if action_url and action_text %}
+        <a href="{{ action_url }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus me-1"></i>{{ action_text }}
+        </a>
+        {% endif %}
+    </div>
+</div>

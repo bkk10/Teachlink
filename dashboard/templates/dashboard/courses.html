@@ -1,0 +1,16 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}My Courses{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    {% if user.role == 'TEACHER' %}
+        {% include "dashboard/teacher/courses.html" %}
+    {% elif user.role == 'STUDENT' %}
+        {% include "dashboard/student/courses.html" %}
+    {% else %}
+        {% include "dashboard/admin/courses.html" %}
+    {% endif %}
+</div>
+{% endblock %}

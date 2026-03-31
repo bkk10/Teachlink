@@ -1,0 +1,164 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Set Questions{% endblock %}
+
+{% block extra_css %}
+<style>
+    .builder-shell { max-width: 1350px; margin: 0 auto; }
+    .builder-hero {
+        border: 1px solid #dbeafe;
+        border-radius: 1rem;
+        padding: 1rem 1.2rem;
+        background: linear-gradient(120deg, #eff6ff 0%, #f8fbff 100%);
+        margin-bottom: 1rem;
+    }
+    .builder-panel {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        overflow: hidden;
+    }
+    .builder-head {
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 800;
+        color: #0f172a;
+        background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+    }
+    .builder-body { padding: 1rem; }
+    .question-card {
+        border: 1px solid #dbe5f0;
+        border-radius: 0.85rem;
+        padding: 0.9rem;
+        margin-bottom: 0.8rem;
+        background: #ffffff;
+    }
+    .correct-answer {
+        color: #166534;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 builder-shell">
+    <div class="builder-hero d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <p class="text-uppercase text-primary small fw-semibold mb-1">Teacher Assessment Builder</p>
+            <h2 class="fw-bold mb-1">{{ quiz.title }}</h2>
+            <p class="text-muted mb-0">{{ course.title }} | {{ quiz.lesson.title }}</p>
+        </div>
+        <a href="{% url 'dashboard_courses' %}?open_course={{ course.id }}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Course Workspace
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} mb-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-xl-5">
+            <section class="builder-panel mb-4">
+                <div class="builder-head"><i class="fas fa-sliders-h me-2"></i>Assessment Settings</div>
+                <div class="builder-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="save_quiz_meta">
+                        <div class="mb-3">
+                            <label class="form-label">Title</label>
+                            <input type="text" name="title" class="form-control" required value="{{ quiz.title }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" rows="3" class="form-control">{{ quiz.description }}</textarea>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label">Pass %</label>
+                                <input type="number" min="0" max="100" name="passing_score" class="form-control" value="{{ quiz.passing_score }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Time (mins)</label>
+                                <input type="number" min="0" name="time_limit_minutes" class="form-control" value="{{ quiz.time_limit_minutes }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Attempts</label>
+                                <input type="number" min="1" name="max_attempts" class="form-control" value="{{ quiz.max_attempts }}">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3">Save Settings</button>
+                    </form>
+                </div>
+            </section>
+
+            <section class="builder-panel">
+                <div class="builder-head"><i class="fas fa-plus-circle me-2"></i>Add Question</div>
+                <div class="builder-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_question">
+                        <div class="mb-3">
+                            <label class="form-label">Question</label>
+                            <textarea name="question_text" rows="3" class="form-control" placeholder="Type question text" required></textarea>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Options</label>
+                            <input type="text" name="option_1" class="form-control mb-2" placeholder="Option 1" required>
+                            <input type="text" name="option_2" class="form-control mb-2" placeholder="Option 2" required>
+                            <input type="text" name="option_3" class="form-control mb-2" placeholder="Option 3">
+                            <input type="text" name="option_4" class="form-control" placeholder="Option 4">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Correct Answer Position</label>
+                            <select name="correct_index" class="form-select">
+                                <option value="1">Option 1</option>
+                                <option value="2">Option 2</option>
+                                <option value="3">Option 3</option>
+                                <option value="4">Option 4</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-success">Add Question</button>
+                    </form>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-xl-7">
+            <section class="builder-panel">
+                <div class="builder-head d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-list-check me-2"></i>Questions ({{ quiz.total_questions }})</span>
+                </div>
+                <div class="builder-body">
+                    {% if question_rows %}
+                        {% for row in question_rows %}
+                            <article class="question-card">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <h5 class="fw-bold mb-2">Q{{ row.question.order }}. {{ row.question.text }}</h5>
+                                    <form method="post" class="ms-2">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_question">
+                                        <input type="hidden" name="question_id" value="{{ row.question.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                </div>
+                                <ol class="mb-2 ps-3">
+                                    {% for ans in row.answers %}
+                                        <li class="{% if ans.is_correct %}correct-answer{% endif %}">{{ ans.text }}</li>
+                                    {% endfor %}
+                                </ol>
+                                <div class="small text-muted">Points: {{ row.question.points }}</div>
+                            </article>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-muted">No questions added yet. Use the form on the left to add your first question.</div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

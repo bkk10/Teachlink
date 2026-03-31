@@ -1,0 +1,151 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Enrollment Status{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h3 class="mb-1 fw-bold"><i class="fas fa-wallet text-primary me-2"></i>Enrollment Status</h3>
+            <p class="text-muted mb-0">Track enrollment and payment status for students (payment optional).</p>
+        </div>
+        <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-primary">
+            <i class="fas fa-chart-pie me-1"></i>Back to Dashboard
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %} mb-2" role="alert">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="bg-white border rounded-3 p-3 h-100">
+                <div class="text-muted small">Total Active Enrollments</div>
+                <div class="fs-4 fw-bold">{{ total_count }}</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="bg-white border rounded-3 p-3 h-100">
+                <div class="text-muted small">Paid</div>
+                <div class="fs-4 fw-bold text-success">{{ paid_count }}</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="bg-white border rounded-3 p-3 h-100">
+                <div class="text-muted small">Not Paid</div>
+                <div class="fs-4 fw-bold text-danger">{{ unpaid_count }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white border rounded-3 p-3 p-md-4">
+        <form method="get" class="row g-2 align-items-end mb-3">
+            <div class="col-12 col-md-4">
+                <label class="form-label small text-muted mb-1">Filter by Course</label>
+                <select class="form-select" name="course">
+                    <option value="">All Courses</option>
+                    {% for course in courses %}
+                    <option value="{{ course.id }}" {% if selected_course_id == course.id %}selected{% endif %}>{{ course.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label small text-muted mb-1">Payment Status</label>
+                <select class="form-select" name="payment">
+                    <option value="all" {% if selected_payment_filter == 'all' %}selected{% endif %}>All</option>
+                    <option value="paid" {% if selected_payment_filter == 'paid' %}selected{% endif %}>Paid</option>
+                    <option value="unpaid" {% if selected_payment_filter == 'unpaid' %}selected{% endif %}>Not Paid</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label small text-muted mb-1">Search by Name</label>
+                <input type="text" class="form-control" name="search" value="{{ search_query }}" placeholder="Student name, email, username">
+            </div>
+            <div class="col-12 col-md-2 d-grid">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter me-1"></i>Apply Filters
+                </button>
+            </div>
+        </form>
+
+        <div class="d-flex flex-wrap gap-2 justify-content-end mb-3">
+            <form method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="payment_action" value="send_unpaid_notifications">
+                <input type="hidden" name="course" value="{{ selected_course_id }}">
+                <input type="hidden" name="payment" value="{{ selected_payment_filter }}">
+                <input type="hidden" name="search" value="{{ search_query }}">
+                <button type="submit" class="btn btn-outline-warning">
+                    <i class="fas fa-bell me-1"></i>Send Notification to Unpaid
+                </button>
+            </form>
+            <form method="get" class="d-inline">
+                <input type="hidden" name="course" value="{{ selected_course_id }}">
+                <input type="hidden" name="payment" value="{{ selected_payment_filter }}">
+                <input type="hidden" name="search" value="{{ search_query }}">
+                <input type="hidden" name="export" value="csv">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="fas fa-file-csv me-1"></i>Export CSV
+                </button>
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Course</th>
+                        <th>Enrolled</th>
+                        <th>Status</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for enrollment in enrollments %}
+                    <tr>
+                        <td>{{ enrollment.student.display_name }}</td>
+                        <td>{{ enrollment.course.title }}</td>
+                        <td>{{ enrollment.enrolled_at|date:"M d, Y" }}</td>
+                        <td>
+                            {% if enrollment.is_fee_paid %}
+                            <span class="badge text-bg-success">Paid</span>
+                            {% else %}
+                            <span class="badge text-bg-danger">Not Paid</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="enrollment_id" value="{{ enrollment.id }}">
+                                <input type="hidden" name="course" value="{{ selected_course_id }}">
+                                <input type="hidden" name="payment" value="{{ selected_payment_filter }}">
+                                <input type="hidden" name="search" value="{{ search_query }}">
+                                {% if enrollment.is_fee_paid %}
+                                <input type="hidden" name="payment_action" value="mark_unpaid">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Mark Not Paid</button>
+                                {% else %}
+                                <input type="hidden" name="payment_action" value="mark_paid">
+                                <button type="submit" class="btn btn-sm btn-outline-success">Mark Paid</button>
+                                {% endif %}
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No enrollments found for the selected filters.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

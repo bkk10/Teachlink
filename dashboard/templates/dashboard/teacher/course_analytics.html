@@ -1,0 +1,239 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Course Analytics{% endblock %}
+
+{% block extra_css %}
+<style>
+    .analytics-shell { max-width: 1500px; margin: 0 auto; }
+    .hero {
+        background: radial-gradient(circle at 20% 20%, rgba(37,99,235,0.16), transparent 42%),
+                    linear-gradient(120deg, #f8fbff 0%, #eef5ff 100%);
+        border: 1px solid #dbeafe;
+        border-radius: 1rem;
+        padding: 1.1rem 1.25rem;
+        margin-bottom: 1.15rem;
+    }
+    .analytics-header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+    .analytics-title { font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -0.01em; }
+    .analytics-subtitle { color: #334155; margin-top: 0.25rem; font-size: 1.05rem; }
+    .analytics-divider { border: 0; border-top: 2px solid #bfdbfe; margin: 1rem 0; }
+    .course-pill { display: inline-flex; align-items: center; padding: 0.42rem 0.75rem; border-radius: 0.45rem; background: #2e75bb; color: #fff; font-weight: 700; }
+    .course-pill:hover { color: #fff; background: #1d5f9f; text-decoration: none; }
+    .hero-actions { display: inline-flex; gap: 0.55rem; flex-wrap: wrap; }
+    .panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06); margin-bottom: 1.25rem; overflow: hidden; }
+    .panel-head { padding: 1rem 1.15rem; border-bottom: 1px solid #e2e8f0; font-size: 1.2rem; font-weight: 800; color: #0f172a; }
+    .panel-body { padding: 1rem 1.15rem; }
+    .empty-box { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #64748b; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; margin-bottom: 0.8rem; }
+    .summary-card { border: 1px solid #dbeafe; border-radius: 0.8rem; padding: 0.75rem 0.85rem; background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); }
+    .summary-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.1rem; }
+    .summary-value { font-size: 1.35rem; font-weight: 900; color: #0f172a; }
+    .difficulty-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.15rem 0.55rem; font-size: 0.75rem; font-weight: 700; }
+    .difficulty-low { background: #dcfce7; color: #166534; }
+    .difficulty-medium { background: #fef3c7; color: #92400e; }
+    .difficulty-high { background: #fee2e2; color: #991b1b; }
+    .difficulty-unknown { background: #e2e8f0; color: #334155; }
+    .risk-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.16rem 0.58rem; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.01em; }
+    .risk-high { background: #fee2e2; color: #991b1b; }
+    .risk-medium { background: #fef3c7; color: #92400e; }
+    .risk-low { background: #dcfce7; color: #166534; }
+    .risk-unknown { background: #e2e8f0; color: #334155; }
+    .drilldown-row td { background: #f8fafc; border-top: 0; }
+    .drilldown-panel { border: 1px solid #e2e8f0; border-radius: 0.7rem; background: #fff; padding: 0.65rem 0.75rem; }
+    .drilldown-title { font-size: 0.85rem; font-weight: 700; color: #0f172a; margin-bottom: 0.45rem; }
+    .assessment-note { display: inline-flex; align-items: center; gap: 0.35rem; color: #b45309; font-size: 0.74rem; font-weight: 600; margin-top: 0.2rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 analytics-shell">
+    <div class="hero">
+        <div class="analytics-header">
+            <div>
+                <h1 class="analytics-title"><i class="fas fa-gauge-high me-2 text-primary"></i>Analytics Dashboard</h1>
+                <p class="analytics-subtitle">Monitor student risk, engagement, and course health</p>
+            </div>
+            <div class="hero-actions">
+                <a href="{% url 'dashboard_courses' %}?open_course={{ course.id }}" class="btn btn-success btn-lg">
+                    <i class="fas fa-layer-group me-2"></i>Open Workspace
+                </a>
+                <a href="{% url 'dashboard_courses' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-circle-plus me-2"></i>New Course
+                </a>
+            </div>
+        </div>
+        <hr class="analytics-divider">
+        <div class="mb-1">
+            <a href="{% url 'dashboard_courses' %}?open_course={{ course.id }}" class="course-pill">{{ course.title }}</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><i class="fas fa-users me-2"></i>Student Risk Overview</div>
+        <div class="panel-body">
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-label">Total Students</div>
+                    <div class="summary-value">{{ risk_summary.total }}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">High Risk</div>
+                    <div class="summary-value">{{ risk_summary.high }}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Medium Risk</div>
+                    <div class="summary-value">{{ risk_summary.medium }}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Low Risk</div>
+                    <div class="summary-value">{{ risk_summary.low }}</div>
+                </div>
+            </div>
+
+            {% if enrollments %}
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Student</th>
+                                <th>Progress</th>
+                                <th>Quiz Avg</th>
+                                <th>Risk</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for e in enrollments %}
+                                <tr>
+                                    <td>{{ e.student.display_name }}</td>
+                                    <td>{{ e.progress_percentage|floatformat:1 }}%</td>
+                                    <td>{{ e.average_quiz_score|floatformat:1 }}%</td>
+                                    <td>
+                                        {% if e.risk_level == 'HIGH' or e.risk_level == 'CRITICAL' %}
+                                            <span class="risk-pill risk-high">HIGH</span>
+                                        {% elif e.risk_level == 'MEDIUM' %}
+                                            <span class="risk-pill risk-medium">MEDIUM</span>
+                                        {% elif e.risk_level == 'LOW' %}
+                                            <span class="risk-pill risk-low">LOW</span>
+                                        {% else %}
+                                            <span class="risk-pill risk-unknown">{{ e.risk_level|default:'UNKNOWN' }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-box">
+                    <i class="fas fa-users text-5xl mb-2"></i>
+                    <div class="fs-3">No students enrolled yet.</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><i class="fas fa-list-check me-2"></i>Lesson Difficulty Ranking</div>
+        <div class="panel-body p-0">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Lesson</th>
+                            <th>Attempts <span class="text-muted" title="Completed quiz submissions for this lesson"><i class="fas fa-circle-info"></i></span></th>
+                            <th>Failures <span class="text-muted" title="Completed submissions below passing score"><i class="fas fa-circle-info"></i></span></th>
+                            <th>Failure Rate</th>
+                            <th>Accesses</th>
+                            <th>Difficulty</th>
+                            <th>Setup</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in lesson_rows %}
+                            <tr>
+                                <td class="ps-3">
+                                    <div>{{ row.lesson_title }}</div>
+                                    {% if not row.has_quiz %}
+                                        <div class="assessment-note"><i class="fas fa-circle-info"></i>No assessment configured yet</div>
+                                    {% endif %}
+                                </td>
+                                <td>{% if row.has_quiz %}{{ row.attempts }}{% else %}<span class="text-muted">N/A</span>{% endif %}</td>
+                                <td>{% if row.has_quiz %}{{ row.failures }}{% else %}<span class="text-muted">N/A</span>{% endif %}</td>
+                                <td>{% if row.has_quiz %}{{ row.failure_rate }}%{% else %}<span class="text-muted">N/A</span>{% endif %}</td>
+                                <td>
+                                    <a href="#accessBreakdown{{ forloop.counter }}" class="fw-semibold text-decoration-none" data-bs-toggle="collapse" aria-expanded="false" aria-controls="accessBreakdown{{ forloop.counter }}">
+                                        More details ({{ row.access_students_count }} students)
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if row.difficulty_level == 'LOW' or row.difficulty_level == 'EASY' or row.difficulty_level == 'VERY_EASY' %}
+                                        <span class="difficulty-pill difficulty-low">LOW</span>
+                                    {% elif row.difficulty_level == 'MEDIUM' %}
+                                        <span class="difficulty-pill difficulty-medium">MEDIUM</span>
+                                    {% elif row.difficulty_level == 'HIGH' or row.difficulty_level == 'HARD' or row.difficulty_level == 'VERY_HARD' %}
+                                        <span class="difficulty-pill difficulty-high">HIGH</span>
+                                    {% else %}
+                                        <span class="difficulty-pill difficulty-unknown">UNKNOWN</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if row.has_quiz %}
+                                        <a href="{% url 'teacher_quiz_builder' row.quiz_id %}" class="btn btn-sm btn-outline-primary">
+                                            Set Questions
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">Add quiz in workspace</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr class="collapse drilldown-row" id="accessBreakdown{{ forloop.counter }}">
+                                <td colspan="7">
+                                    <div class="drilldown-panel">
+                                        <div class="drilldown-title">Student Access Log - {{ row.lesson_title }}</div>
+                                        {% if not row.has_quiz %}
+                                            <div class="alert alert-warning py-2 px-3 small mb-2">
+                                                No assessment has been added for this lesson yet. Add a quiz to start tracking attempts, failures, and failure rate.
+                                            </div>
+                                        {% endif %}
+                                        {% if row.student_access_breakdown %}
+                                            <div class="table-responsive">
+                                                <table class="table table-sm align-middle mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Student</th>
+                                                            <th>Access Count</th>
+                                                            <th>Attempts</th>
+                                                            <th>Failures</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for student_row in row.student_access_breakdown %}
+                                                            <tr>
+                                                                <td>{{ student_row.student_name }}</td>
+                                                                <td>{{ student_row.accesses }}</td>
+                                                                <td>{% if student_row.attempts is None %}<span class="text-muted">N/A</span>{% else %}{{ student_row.attempts }}{% endif %}</td>
+                                                                <td>{% if student_row.failures is None %}<span class="text-muted">N/A</span>{% else %}{{ student_row.failures }}{% endif %}</td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        {% else %}
+                                            <div class="text-muted">No student access data yet for this lesson.</div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="7" class="text-center text-muted py-4">No lessons available.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-3 py-2 text-muted small border-top">
+                <strong>Definitions:</strong> Attempts = completed quiz submissions for the lesson. Failures = completed submissions with score below passing threshold.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

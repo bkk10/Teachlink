@@ -1,0 +1,828 @@
+{% comment %}
+What-If Risk Simulator Component
+Allows teachers to predict student risk score given hypothetical scenarios
+{% endcomment %}
+
+<div class="whatif-simulator">
+    <div class="whatif-header">
+        <h3><i class="fas fa-crystal-ball"></i> Risk Prediction Simulator</h3>
+        <p class="whatif-subtitle">What happens if the student takes these actions?</p>
+    </div>
+    
+    <div class="simulator-container">
+        <!-- Current Status Card -->
+        <div class="status-card current-status">
+            <div class="status-card-header">Current Risk Profile</div>
+            <div class="status-card-body">
+                <div class="status-metric">
+                    <span class="metric-label">Student:</span>
+                    <span class="metric-value">{{ enrollment.student.display_name }}</span>
+                </div>
+                <div class="status-metric">
+                    <span class="metric-label">Current Progress:</span>
+                    <span class="metric-value">{{ enrollment.progress_percentage|floatformat:0 }}%</span>
+                </div>
+                <div class="status-metric">
+                    <span class="metric-label">Quiz Average:</span>
+                    <span class="metric-value">{{ enrollment.average_quiz_score|floatformat:0 }}%</span>
+                </div>
+                <div class="status-metric">
+                    <span class="metric-label">Days Inactive:</span>
+                    <span class="metric-value">{{ enrollment.days_since_last_activity }}</span>
+                </div>
+                <div class="status-metric risk-indicator">
+                    <span class="metric-label">Risk Score:</span>
+                    <span class="badge risk-{{ enrollment.risk_level|lower }}">
+                        {{ enrollment.risk_level }} ({{ enrollment.risk_score|floatformat:3 }})
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Simulator Form -->
+        <div class="simulator-form-wrapper">
+            <form id="form-whatif-simulator" class="whatif-form">
+                {% csrf_token %}
+                <input type="hidden" name="enrollment_id" value="{{ enrollment.id }}">
+                
+                <div class="form-group">
+                    <label for="whatif-progress">
+                        <i class="fas fa-book"></i> Lessons Completed
+                        <span class="tooltip-icon" title="How many additional lessons will the student complete?">?</span>
+                    </label>
+                    <div class="input-group">
+                        <input type="range" id="whatif-progress-slider" name="additional_lessons" min="0" max="10" value="0" class="form-range">
+                        <span id="whatif-progress-value" class="input-addon">0</span>
+                    </div>
+                    <div class="form-text">
+                        This will add approximately <span id="progress-increment">0</span>% to current progress
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="whatif-quiz">
+                        <i class="fas fa-graduation-cap"></i> Quiz Score
+                        <span class="tooltip-icon" title="What score will the student get on their next quiz?">?</span>
+                    </label>
+                    <div class="input-group">
+                        <input type="range" id="whatif-quiz-slider" name="hypothetical_quiz_score" min="0" max="100" value="{{ enrollment.average_quiz_score|floatformat:0 }}" class="form-range">
+                        <span id="whatif-quiz-value" class="input-addon">{{ enrollment.average_quiz_score|floatformat:0 }}%</span>
+                    </div>
+                    <div class="form-text">
+                        Expected score based on current performance: {{ enrollment.average_quiz_score|floatformat:0 }}%
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="whatif-activity">
+                        <i class="fas fa-clock"></i> Days Since Activity
+                        <span class="tooltip-icon" title="How many days until next activity?">?</span>
+                    </label>
+                    <div class="input-group">
+                        <input type="range" id="whatif-activity-slider" name="hypothetical_inactivity_days" min="0" max="30" value="0" class="form-range">
+                        <span id="whatif-activity-value" class="input-addon">0 days</span>
+                    </div>
+                    <div class="form-text">
+                        0 days = active today, 7 days = active next week
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-lg btn-block">
+                    <i class="fas fa-calculator"></i> Calculate Predicted Risk
+                </button>
+            </form>
+            
+            <!-- Loading State -->
+            <div id="whatif-loading" class="whatif-loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Calculating predicted risk...</p>
+            </div>
+        </div>
+        
+        <!-- Prediction Results -->
+        <div id="whatif-results" class="whatif-results" style="display: none;">
+            <div class="results-header">
+                <h4>Prediction Results</h4>
+            </div>
+            
+            <div class="results-grid">
+                <!-- Current vs Predicted -->
+                <div class="result-card">
+                    <div class="result-title">Risk Scores</div>
+                    <div class="score-comparison">
+                        <div class="score-item">
+                            <span class="score-label">Current</span>
+                            <span id="result-current-risk" class="score-value badge">0.000</span>
+                        </div>
+                        <div class="score-arrow">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                        <div class="score-item">
+                            <span class="score-label">Predicted</span>
+                            <span id="result-predicted-risk" class="score-value badge">0.000</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Risk Levels -->
+                <div class="result-card">
+                    <div class="result-title">Risk Levels</div>
+                    <div class="level-comparison">
+                        <div class="level-item">
+                            <span class="level-label">Current:</span>
+                            <span id="result-current-level" class="badge">LOW</span>
+                        </div>
+                        <div class="level-item">
+                            <span class="level-label">Predicted:</span>
+                            <span id="result-predicted-level" class="badge">LOW</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Improvement -->
+                <div class="result-card improvement-card">
+                    <div class="result-title">Impact</div>
+                    <div class="improvement-metric">
+                        <span id="result-improvement" class="improvement-value">
+                            <i class="fas fa-arrow-up"></i> +0.000
+                        </span>
+                        <span id="result-improvement-text" class="improvement-text">No improvement</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Risk Gauge -->
+            <div class="risk-gauge-container">
+                <div class="gauge-label">Risk Score Trajectory</div>
+                <div class="risk-gauge">
+                    <div class="gauge-track">
+                        <div class="gauge-zone zone-low"></div>
+                        <div class="gauge-zone zone-medium"></div>
+                        <div class="gauge-zone zone-high"></div>
+                    </div>
+                    <div id="gauge-current-marker" class="gauge-marker current-marker"></div>
+                    <div id="gauge-predicted-marker" class="gauge-marker predicted-marker"></div>
+                </div>
+                <div class="gauge-legend">
+                    <div class="legend-item"><span class="legend-color low"></span> Low Risk</div>
+                    <div class="legend-item"><span class="legend-color medium"></span> Medium Risk</div>
+                    <div class="legend-item"><span class="legend-color high"></span> High Risk</div>
+                </div>
+            </div>
+            
+            <!-- Recommendations -->
+            <div id="recommendations" class="recommendations-section">
+                <div class="recommendations-header">
+                    <i class="fas fa-lightbulb"></i> Recommendations
+                </div>
+                <ul id="recommendations-list" class="recommendations-list">
+                    <!-- Populated via JavaScript -->
+                </ul>
+            </div>
+            
+            <button class="btn btn-secondary" onclick="resetSimulator()">
+                <i class="fas fa-redo"></i> Try Another Scenario
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.whatif-simulator {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.whatif-header {
+    margin-bottom: 1.5rem;
+}
+
+.whatif-header h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.25rem;
+}
+
+.whatif-subtitle {
+    color: #6b7280;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.simulator-container {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 1.5rem;
+}
+
+.status-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+}
+
+.status-card-header {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.status-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: white;
+    border-radius: 0.375rem;
+    font-size: 0.9rem;
+}
+
+.metric-label {
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.metric-value {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.status-metric.risk-indicator {
+    background: linear-gradient(135deg, #fef3c7 0%, #fee2e2 100%);
+    border: 1px solid #fbbf24;
+    padding: 0.75rem;
+}
+
+.status-metric.risk-indicator .metric-label {
+    color: #92400e;
+}
+
+.simulator-form-wrapper {
+    display: flex;
+    flex-direction: column;
+}
+
+.whatif-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.whatif-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.whatif-form label {
+    font-weight: 600;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.tooltip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: #e0e7ff;
+    color: #4338ca;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: help;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.form-range {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: #e5e7eb;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.form-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.form-range::-moz-range-thumb {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.input-addon {
+    min-width: 50px;
+    text-align: right;
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 0.95rem;
+}
+
+.form-text {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.btn-block {
+    width: 100%;
+}
+
+.whatif-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem;
+    text-align: center;
+    color: #6b7280;
+}
+
+.spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid #e5e7eb;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.whatif-results {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #f8fbff 0%, #f0fdf4 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.results-header {
+    margin-bottom: 1rem;
+}
+
+.results-header h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.result-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.result-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 0.75rem;
+}
+
+.score-comparison {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.score-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 1;
+}
+
+.score-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.score-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    padding: 0.5rem 0.75rem;
+}
+
+.score-arrow {
+    color: #d1d5db;
+    font-size: 1.25rem;
+}
+
+.level-comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.level-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.level-label {
+    font-weight: 600;
+    color: #374151;
+}
+
+.improvement-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dbeafe 100%);
+    border: 1px solid #86efac;
+}
+
+.improvement-metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.improvement-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #16a34a;
+}
+
+.improvement-value.worsening {
+    color: #dc2626;
+}
+
+.improvement-text {
+    font-size: 0.85rem;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.risk-gauge-container {
+    margin-bottom: 1.5rem;
+}
+
+.gauge-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.risk-gauge {
+    position: relative;
+    margin-bottom: 0.75rem;
+}
+
+.gauge-track {
+    display: flex;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.gauge-zone {
+    flex: 1;
+}
+
+.gauge-zone.zone-low {
+    background: linear-gradient(90deg, #dcfce7 0%, #86efac 100%);
+}
+
+.gauge-zone.zone-medium {
+    background: linear-gradient(90deg, #fef3c7 0%, #fcd34d 100%);
+}
+
+.gauge-zone.zone-high {
+    background: linear-gradient(90deg, #fee2e2 0%, #fca5a5 100%);
+}
+
+.gauge-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 3rem;
+    background: white;
+    border: 2px solid #374151;
+    border-radius: 2px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.gauge-marker.current-marker {
+    border-color: #3b82f6;
+    background: #3b82f6;
+}
+
+.gauge-marker.predicted-marker {
+    border-color: #10b981;
+    background: #10b981;
+    opacity: 0.7;
+}
+
+.gauge-legend {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.legend-color {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 0.125rem;
+}
+
+.legend-color.low {
+    background: #86efac;
+}
+
+.legend-color.medium {
+    background: #fcd34d;
+}
+
+.legend-color.high {
+    background: #fca5a5;
+}
+
+.recommendations-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.recommendations-header {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.recommendations-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.recommendations-list li {
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
+    color: #374151;
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+.recommendations-list li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: #10b981;
+    font-weight: 700;
+}
+
+@media (max-width: 1024px) {
+    .simulator-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .results-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .score-comparison {
+        gap: 0.25rem;
+    }
+
+    .score-item {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: baseline;
+        flex: 1;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const progressSlider = document.getElementById('whatif-progress-slider');
+    const progressValue = document.getElementById('whatif-progress-value');
+    const progressIncrement = document.getElementById('progress-increment');
+    const quizSlider = document.getElementById('whatif-quiz-slider');
+    const quizValue = document.getElementById('whatif-quiz-value');
+    const activitySlider = document.getElementById('whatif-activity-slider');
+    const activityValue = document.getElementById('whatif-activity-value');
+    const form = document.getElementById('form-whatif-simulator');
+    
+    // Update slider value displays
+    progressSlider.addEventListener('input', function() {
+        progressValue.textContent = this.value;
+        progressIncrement.textContent = (parseInt(this.value) * 10);
+    });
+    
+    quizSlider.addEventListener('input', function() {
+        quizValue.textContent = this.value + '%';
+    });
+    
+    activitySlider.addEventListener('input', function() {
+        activityValue.textContent = this.value + ' days';
+    });
+    
+    // Form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        simulateRisk();
+    });
+});
+
+function simulateRisk() {
+    const form = document.getElementById('form-whatif-simulator');
+    const formData = new FormData(form);
+    
+    // Show loading
+    document.getElementById('whatif-loading').style.display = 'flex';
+    document.getElementById('whatif-results').style.display = 'none';
+    
+    // Simulate API call
+    setTimeout(function() {
+        // Mock calculation
+        const additionalLessons = parseInt(formData.get('additional_lessons'));
+        const quizScore = parseInt(formData.get('hypothetical_quiz_score'));
+        const inactivityDays = parseInt(formData.get('hypothetical_inactivity_days'));
+        
+        const currentProgress = {{ enrollment.progress_percentage|floatformat:0 }};
+        const currentQuiz = {{ enrollment.average_quiz_score|floatformat:0 }};
+        
+        const newProgress = Math.min(100, currentProgress + (additionalLessons * 10));
+        const progressComponent = Math.max(0, 1 - (newProgress / 100));
+        const quizComponent = Math.max(0, 1 - (quizScore / 100));
+        const inactivityComponent = Math.min(1, inactivityDays / 14);
+        
+        const predictedRisk = (progressComponent * 0.4 + quizComponent * 0.4 + inactivityComponent * 0.2);
+        const currentRisk = {{ enrollment.risk_score|floatformat:3 }};
+        const improvement = currentRisk - predictedRisk;
+        
+        displayResults(currentRisk, predictedRisk, improvement);
+    }, 800);
+}
+
+function displayResults(currentRisk, predictedRisk, improvement) {
+    document.getElementById('whatif-loading').style.display = 'none';
+    document.getElementById('whatif-results').style.display = 'block';
+    
+    // Update scores
+    document.getElementById('result-current-risk').textContent = currentRisk.toFixed(3);
+    document.getElementById('result-predicted-risk').textContent = predictedRisk.toFixed(3);
+    
+    // Update levels and improvement
+    const riskLevels = getRiskLevel;
+    document.getElementById('result-current-level').textContent = riskLevel(currentRisk);
+    document.getElementById('result-predicted-level').textContent = riskLevel(predictedRisk);
+    
+    // Update improvement
+    const improvementEl = document.getElementById('result-improvement');
+    const improvementText = document.getElementById('result-improvement-text');
+    
+    if (improvement > 0.05) {
+        improvementEl.innerHTML = '<i class="fas fa-arrow-down"></i> -' + Math.abs(improvement).toFixed(3);
+        improvementEl.className = 'improvement-value';
+        improvementText.textContent = 'Risk would improve';
+    } else if (improvement < -0.05) {
+        improvementEl.innerHTML = '<i class="fas fa-arrow-up"></i> +' + improvement.toFixed(3);
+        improvementEl.className = 'improvement-value worsening';
+        improvementText.textContent = 'Risk would worsen';
+    } else {
+        improvementEl.innerHTML = '<i class="fas fa-minus"></i> No change';
+        improvementEl.className = 'improvement-value';
+        improvementText.textContent = 'Risk would stay the same';
+    }
+    
+    // Update gauge
+    const currentPercent = (currentRisk / 1) * 100;
+    const predictedPercent = (predictedRisk / 1) * 100;
+    
+    document.getElementById('gauge-current-marker').style.left = Math.min(95, currentPercent) + '%';
+    document.getElementById('gauge-predicted-marker').style.left = Math.min(95, predictedPercent) + '%';
+    
+    // Generate recommendations
+    generateRecommendations(improvement, predictedRisk);
+}
+
+function riskLevel(score) {
+    if (score > 0.60) return 'HIGH';
+    if (score > 0.30) return 'MEDIUM';
+    return 'LOW';
+}
+
+function generateRecommendations(improvement, predictedRisk) {
+    const list = document.getElementById('recommendations-list');
+    const recommendations = [];
+    
+    if (improvement > 0.1) {
+        recommendations.push('This intervention would significantly improve student risk');
+    } else if (improvement > 0.05) {
+        recommendations.push('This intervention would moderately improve student risk');
+    } else if (improvement < -0.05) {
+        recommendations.push('Be cautious - this scenario may worsen student risk');
+    }
+    
+    if (predictedRisk < 0.30) {
+        recommendations.push('After these actions, student would be at low risk');
+    } else if (predictedRisk < 0.60) {
+        recommendations.push('After these actions, student would be at medium risk - continue monitoring');
+    } else {
+        recommendations.push('Even after these actions, student would remain at high risk - additional support needed');
+    }
+    
+    list.innerHTML = recommendations.map(r => `<li>${r}</li>`).join('');
+}
+
+function resetSimulator() {
+    document.getElementById('form-whatif-simulator').reset();
+    document.getElementById('whatif-results').style.display = 'none';
+    document.getElementById('whatif-progress-value').textContent = '0';
+    document.getElementById('whatif-quiz-value').textContent = '0%';
+    document.getElementById('whatif-activity-value').textContent = '0 days';
+}
+</script>

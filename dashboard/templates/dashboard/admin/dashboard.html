@@ -1,0 +1,129 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Admin Overview{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">
+            <i class="fas fa-shield-alt text-blue-600 mr-2"></i>
+            Admin Overview
+        </h1>
+        <a href="/admin/" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+            <i class="fas fa-cog mr-2"></i>Django Admin
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg shadow p-5">
+            <p class="text-sm text-gray-500">Total Users</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ total_users }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ total_teachers }} teachers, {{ total_students }} students</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-5">
+            <p class="text-sm text-gray-500">Published Courses</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ published_courses }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ active_enrollments }} active enrollments</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-5">
+            <p class="text-sm text-gray-500">Alerts</p>
+            <p class="text-2xl font-semibold text-red-600">{{ active_alerts }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ resolved_alerts }} resolved</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-5">
+            <p class="text-sm text-gray-500">Quiz Attempts (24h)</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ quiz_attempts_24h }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Teachers Using The System</h2>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for teacher in teachers_using_system %}
+                <div class="px-6 py-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ teacher.display_name }}</p>
+                        <p class="text-xs text-gray-500">{{ teacher.email }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500">{{ teacher.total_courses }} courses</p>
+                        <p class="text-xs text-gray-400">{{ teacher.total_enrollments }} enrollments</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="px-6 py-4 text-sm text-gray-500">No active teachers yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Enrolled Students</h2>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for student in enrolled_students %}
+                <div class="px-6 py-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ student.display_name }}</p>
+                        <p class="text-xs text-gray-500">{{ student.email }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500">{{ student.active_courses }} active classes</p>
+                        <p class="text-xs text-gray-400">Avg quiz: {{ student.avg_quiz|default:0|floatformat:1 }}%</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="px-6 py-4 text-sm text-gray-500">No enrolled students yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Recent Users</h2>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for account in recent_users %}
+                <div class="px-6 py-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ account.display_name }}</p>
+                        <p class="text-xs text-gray-500">{{ account.email }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500">{{ account.get_role_display }}</p>
+                        <p class="text-xs text-gray-400">{{ account.date_joined|date:"M d, Y H:i" }}</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="px-6 py-4 text-sm text-gray-500">No users yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Recent Alerts</h2>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for alert in recent_alerts %}
+                <div class="px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <p class="text-sm font-medium text-gray-900">{{ alert.title }}</p>
+                        <span class="text-xs text-gray-500">{{ alert.status }}</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mt-1">{{ alert.student.display_name }} - {{ alert.course.title|default:"No course" }}</p>
+                    <p class="text-xs text-gray-400 mt-1">{{ alert.generated_at|date:"M d, Y H:i" }}</p>
+                </div>
+                {% empty %}
+                <div class="px-6 py-4 text-sm text-gray-500">No alerts yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

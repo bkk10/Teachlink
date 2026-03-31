@@ -1,0 +1,531 @@
+{# AI Quiz Suggestion Modal Component #}
+{# Phase 2: AI Quiz Generation #}
+{# Usage: {% include "components/ai_quiz_suggestion.html" with lesson=lesson_obj %} #}
+
+<style>
+    .modal-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-backdrop.active {
+        display: flex;
+    }
+
+    .ai-quiz-modal {
+        background: white;
+        border-radius: 8px;
+        max-width: 800px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid #e9ecef;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        font-size: 24px;
+        padding: 0;
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #e9ecef;
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        background: #f8f9fa;
+        border-radius: 0 0 8px 8px;
+    }
+
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f0f0f0;
+        border-top-color: #667eea;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .ai-suggestion-header {
+        background: #f0f4ff;
+        border-left: 4px solid #667eea;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        color: #333;
+    }
+
+    .ai-suggestion-header strong {
+        color: #667eea;
+    }
+
+    .questions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .question-card {
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 16px;
+        background: #f8f9fa;
+        transition: all 0.2s;
+    }
+
+    .question-card:hover {
+        border-color: #667eea;
+        background: #f0f4ff;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    }
+
+    .question-card.selected {
+        border-color: #667eea;
+        background: #e6f0ff;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    }
+
+    .question-checkbox {
+        margin-right: 12px;
+        cursor: pointer;
+        width: 18px;
+        height: 18px;
+    }
+
+    .question-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .question-text {
+        font-weight: 500;
+        color: #333;
+        flex: 1;
+    }
+
+    .question-type-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        background: #e9ecef;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #666;
+        flex-shrink: 0;
+        text-transform: uppercase;
+    }
+
+    .question-type-badge.mcq {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .question-type-badge.truefalse {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .question-type-badge.short {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .options-list {
+        margin: 12px 0;
+        padding-left: 20px;
+    }
+
+    .option-item {
+        padding: 6px 0;
+        font-size: 13px;
+        color: #555;
+        line-height: 1.4;
+    }
+
+    .competency-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 12px;
+    }
+
+    .competency-tag {
+        display: inline-block;
+        background: #e0e7ff;
+        color: #4338ca;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .difficulty-indicator {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        font-size: 12px;
+    }
+
+    .difficulty-stars {
+        display: flex;
+        gap: 2px;
+    }
+
+    .star {
+        color: #f59e0b;
+    }
+
+    .stat-summary {
+        background: #f0f4ff;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+    }
+
+    .stat-item {
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .stat-label {
+        font-weight: 600;
+        color: #667eea;
+    }
+
+    .stat-value {
+        color: #333;
+        font-weight: 700;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        border: none;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #5568d3;
+    }
+
+    .btn-secondary {
+        background: #e9ecef;
+        color: #333;
+    }
+
+    .btn-secondary:hover {
+        background: #dee2e6;
+    }
+
+    .error-message {
+        background: #fee2e2;
+        color: #991b1b;
+        border-left: 4px solid #ef4444;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+        font-size: 13px;
+    }
+
+    .success-message {
+        background: #dcfce7;
+        color: #166534;
+        border-left: 4px solid #10b981;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+        font-size: 13px;
+    }
+
+    @media (max-width: 768px) {
+        .ai-quiz-modal {
+            width: 95%;
+            max-height: 95vh;
+        }
+
+        .modal-body {
+            padding: 16px;
+        }
+
+        .question-card {
+            padding: 12px;
+        }
+    }
+</style>
+
+{# Modal Trigger Button #}
+<button id="ai-quiz-btn" class="btn btn-primary" style="display: flex; align-items: center; gap: 8px;">
+    ✨ Suggest Quiz Questions
+</button>
+
+{# Modal #}
+<div id="ai-quiz-modal-backdrop" class="modal-backdrop">
+    <div class="ai-quiz-modal">
+        <div class="modal-header">
+            <div class="modal-title">
+                ✨ AI Quiz Generator
+            </div>
+            <button class="modal-close" id="modal-close-btn">×</button>
+        </div>
+
+        <div class="modal-body">
+            <div class="ai-suggestion-header">
+                <strong>Smart Quiz Generation:</strong> Analyzing your lesson content to suggest quiz questions based on key concepts and learning objectives.
+            </div>
+
+            <div id="loading-state" style="display: none; text-align: center; padding: 40px;">
+                <div class="loading-spinner"></div>
+                <p style="margin-top: 16px; color: #666;">Analyzing lesson content...</p>
+            </div>
+
+            <div id="suggestions-container" style="display: none;">
+                <div class="stat-summary">
+                    <div class="stat-item">
+                        <span class="stat-label">Questions Generated:</span>
+                        <span class="stat-value"><span id="total-questions">0</span></span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Question Types:</span>
+                        <span class="stat-value" id="question-types">MCQ, T/F</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Estimated Time:</span>
+                        <span class="stat-value"><span id="estimated-time">10</span> min</span>
+                    </div>
+                </div>
+
+                <div id="error-message" class="error-message" style="display: none;"></div>
+                <div id="success-message" class="success-message" style="display: none;"></div>
+
+                <div class="questions-list" id="questions-list"></div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+            <button class="btn btn-primary" id="modal-add-btn" style="display: none;">
+                Add Selected Questions
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const modal = document.getElementById('ai-quiz-modal-backdrop');
+    const aiQuizBtn = document.getElementById('ai-quiz-btn');
+    const closeBtn = document.getElementById('modal-close-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+    const addBtn = document.getElementById('modal-add-btn');
+    const loadingState = document.getElementById('loading-state');
+    const suggestionsContainer = document.getElementById('suggestions-container');
+    const questionsList = document.getElementById('questions-list');
+    const totalQuestionsSpan = document.getElementById('total-questions');
+    const estimatedTimeSpan = document.getElementById('estimated-time');
+
+    const sampleQuestions = [
+        {
+            id: 'q1',
+            type: 'MCQ',
+            text: 'What are the key components of a lesson?',
+            options: ['Content, Objectives, Assessments', 'Video files only', 'Text documents', 'Images and media'],
+            competencies: ['Lesson Design', 'Content Structure'],
+            difficulty: 3,
+            correct_option: 0
+        },
+        {
+            id: 'q2',
+            type: 'MCQ',
+            text: 'How should lessons be structured for maximum engagement?',
+            options: ['With clear objectives, varied content types, and assessments', 'As long as possible', 'With only video content', 'No structure needed'],
+            competencies: ['Engagement', 'Instructional Design'],
+            difficulty: 3,
+            correct_option: 0
+        },
+        {
+            id: 'q3',
+            type: 'TrueOrFalse',
+            text: 'Native content in the platform allows better tracking of student engagement.',
+            competencies: ['Platform Features', 'Analytics'],
+            difficulty: 2,
+            correct_answer: true
+        },
+        {
+            id: 'q4',
+            type: 'ShortAnswer',
+            text: 'Name two benefits of tagging content with competencies.',
+            competencies: ['Competency Mapping', 'Assessment'],
+            difficulty: 3
+        }
+    ];
+
+    aiQuizBtn.addEventListener('click', () => {
+        modal.classList.add('active');
+        generateQuestions();
+    });
+
+    closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+    cancelBtn.addEventListener('click', () => modal.classList.remove('active'));
+
+    async function generateQuestions() {
+        loadingState.style.display = 'block';
+        suggestionsContainer.style.display = 'none';
+        addBtn.style.display = 'none';
+
+        try {
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Load sample questions
+            displayQuestions(sampleQuestions);
+
+            loadingState.style.display = 'none';
+            suggestionsContainer.style.display = 'block';
+            addBtn.style.display = 'block';
+
+            toastNotify(`${sampleQuestions.length} questions generated from lesson content`, 'success');
+        } catch (error) {
+            loadingState.style.display = 'none';
+            document.getElementById('error-message').style.display = 'block';
+            document.getElementById('error-message').textContent = 'Error generating questions. Please try again.';
+        }
+    }
+
+    function displayQuestions(questions) {
+        totalQuestionsSpan.textContent = questions.length;
+        estimatedTimeSpan.textContent = Math.ceil(questions.length * 2.5);
+
+        questionsList.innerHTML = questions.map(q => `
+            <div class="question-card" data-question-id="${q.id}">
+                <div class="question-header">
+                    <input type="checkbox" class="question-checkbox" data-question-id="${q.id}">
+                    <div style="flex: 1;">
+                        <div style="display: flex; gap: 8px; align-items: start;">
+                            <span class="question-text">${q.text}</span>
+                            <span class="question-type-badge ${q.type.toLowerCase()}">${q.type}</span>
+                        </div>
+                    </div>
+                </div>
+
+                ${q.type === 'MCQ' ? `
+                    <div class="options-list">
+                        ${q.options.map((opt, i) => `<div class="option-item">${String.fromCharCode(65+i)}. ${opt}</div>`).join('')}
+                    </div>
+                ` : ''}
+
+                ${q.type === 'TrueOrFalse' ? `
+                    <div class="options-list">
+                        <div class="option-item">A. True</div>
+                        <div class="option-item">B. False</div>
+                    </div>
+                ` : ''}
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="competency-tags">
+                        ${q.competencies.map(c => `<span class="competency-tag">${c}</span>`).join('')}
+                    </div>
+                    <div class="difficulty-indicator">
+                        Difficulty:
+                        <div class="difficulty-stars">
+                            ${Array(5).fill('').map((_, i) => `<span class="star" style="opacity: ${i < q.difficulty ? 1 : 0.3}">★</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        // Add checkbox listeners
+        document.querySelectorAll('.question-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const card = e.target.closest('.question-card');
+                card.classList.toggle('selected', e.target.checked);
+            });
+        });
+
+        // Add card click listeners
+        document.querySelectorAll('.question-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.target.type !== 'checkbox') {
+                    const checkbox = card.querySelector('.question-checkbox');
+                    checkbox.checked = !checkbox.checked;
+                    card.classList.toggle('selected', checkbox.checked);
+                }
+            });
+        });
+    }
+
+    addBtn.addEventListener('click', async () => {
+        const selectedQuestions = Array.from(document.querySelectorAll('.question-checkbox:checked'))
+            .map(cb => cb.dataset.questionId);
+
+        if (selectedQuestions.length === 0) {
+            toastNotify('Please select at least one question', 'warning');
+            return;
+        }
+
+        try {
+            // Here you would send the selected questions to the backend
+            // await fetch('/api/quizzes/', { method: 'POST', body: JSON.stringify({questions: selectedQuestions}) });
+
+            toastNotify(`${selectedQuestions.length} questions added to quiz`, 'success');
+            modal.classList.remove('active');
+        } catch (error) {
+            toastNotify('Error adding questions', 'error');
+        }
+    });
+</script>

@@ -1,0 +1,956 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}Course Management{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sortablejs@latest/sortable.min.css">
+<style>
+    /* Course Sidebar */
+    .course-management-shell {
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .course-grid {
+        display: block;
+    }
+
+    .course-grid.focus-mode .course-sidebar {
+        display: none;
+    }
+
+    .course-grid.focus-mode .course-workspace {
+        margin-top: 0;
+    }
+
+    .course-sidebar {
+        max-height: none;
+        overflow-y: visible;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    
+    .course-cards {
+        display: grid;
+        gap: 0.9rem;
+        grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    }
+
+    .course-card {
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        border: 1px solid #d1d5db;
+        border-radius: 0.8rem;
+        background: #ffffff;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .course-card:hover {
+        border-color: #93c5fd;
+        box-shadow: 0 14px 26px rgba(15, 23, 42, 0.12);
+        transform: translateY(-1px);
+    }
+
+    .course-card.active {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18), 0 14px 26px rgba(15, 23, 42, 0.12);
+    }
+
+    .course-cover {
+        height: 165px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .cover-0 { background: linear-gradient(135deg, #0ea5a4 0%, #14b8a6 100%); }
+    .cover-1 { background: radial-gradient(circle at 30% 30%, #7fb8f1 0, #7fb8f1 14%, transparent 15%), radial-gradient(circle at 70% 30%, #6aa6e9 0, #6aa6e9 14%, transparent 15%), linear-gradient(135deg, #8dc1f5 0%, #6ea8e7 100%); background-size: 80px 80px, 80px 80px, cover; }
+    .cover-2 { background: linear-gradient(90deg, rgba(0,0,0,0.08) 6%, transparent 6%), linear-gradient(180deg, rgba(0,0,0,0.08) 8%, transparent 8%), linear-gradient(135deg, #7fd6d8 0%, #88d9db 100%); background-size: 60px 60px, 60px 60px, cover; }
+    .cover-3 { background: linear-gradient(90deg, rgba(0,0,0,0.08) 2%, transparent 2%), linear-gradient(180deg, rgba(0,0,0,0.08) 3%, transparent 3%), linear-gradient(135deg, #e2b85f 0%, #e9c476 100%); background-size: 42px 42px, 42px 42px, cover; }
+    .cover-4 { background: radial-gradient(circle at 25% 20%, rgba(0,0,0,0.08) 0 22%, transparent 23%), radial-gradient(circle at 75% 60%, rgba(0,0,0,0.08) 0 22%, transparent 23%), linear-gradient(135deg, #ebca81 0%, #e7c47a 100%); background-size: 170px 170px, 170px 170px, cover; }
+    .cover-5 { background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.12) 0%, transparent 70%), linear-gradient(135deg, #7fb6ee 0%, #6aa9e8 100%); }
+
+    .course-body {
+        padding: 0.95rem 0.95rem 0.5rem 0.95rem;
+    }
+
+    .course-title {
+        font-size: 1.08rem;
+        line-height: 1.3;
+        color: #b48a12;
+        margin: 0;
+        font-weight: 500;
+    }
+
+    .course-subtitle {
+        font-size: 0.82rem;
+        color: #0f172a;
+        margin-top: 0.35rem;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        font-weight: 700;
+    }
+
+    .course-preview {
+        font-size: 0.76rem;
+        color: #475569;
+        margin-top: 0.35rem;
+    }
+
+    .course-footer {
+        padding: 0.6rem 0.95rem 0.9rem 0.95rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #475569;
+    }
+
+    .course-complete {
+        font-size: 0.86rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+
+    .course-menu-btn {
+        border: 0;
+        background: transparent;
+        color: #c59a1c;
+        width: 1.8rem;
+        height: 1.8rem;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .course-menu-btn:hover {
+        background: #f8fafc;
+        color: #a27e12;
+    }
+
+    
+    /* Student Cards */
+    .student-card {
+        transition: all 0.2s;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .student-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        border-color: #3b82f6;
+    }
+    
+    .risk-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .risk-high { background-color: #fee2e2; color: #991b1b; }
+    .risk-medium { background-color: #fef3c7; color: #92400e; }
+    .risk-low { background-color: #d1fae5; color: #065f46; }
+    
+    /* Drag and Drop */
+    .module-container {
+        background-color: #ffffff;
+        border-radius: 1.25rem;
+        padding: 1rem 1.15rem 0.65rem;
+        margin-bottom: 1rem;
+        border: 1px solid #d6dce5;
+    }
+    
+    .lesson-item {
+        background-color: transparent;
+        border: 0;
+        border-top: 1px solid #e5eaf1;
+        border-radius: 0;
+        padding: 1.05rem 0.3rem;
+        margin-bottom: 0;
+        cursor: default;
+        transition: all 0.2s;
+    }
+    
+    .lesson-item:hover {
+        background-color: #fafcfe;
+    }
+
+    .lessons-container .lesson-item:first-child {
+        border-top: 0;
+    }
+    
+    .module-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        padding: 0.25rem 0.2rem 0.8rem 0.1rem;
+        background-color: transparent;
+        border-radius: 0;
+        margin-bottom: 0.25rem;
+    }
+
+    .module-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 0.95rem;
+        min-width: 0;
+    }
+
+    .module-toggle-btn {
+        width: 2.9rem;
+        height: 2.9rem;
+        border: 1px solid #e4dfcc;
+        border-radius: 0.6rem;
+        background: #f3efe2;
+        color: #c39f1b;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .module-toggle-btn.collapsed i {
+        transform: rotate(-90deg);
+    }
+
+    .module-toggle-btn i {
+        transition: transform 0.2s ease;
+    }
+
+    .module-title-main {
+        font-size: 1.15rem;
+        line-height: 1.25;
+        font-weight: 700;
+        color: #0f274f;
+        font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+    }
+
+    .module-inline-action {
+        white-space: nowrap;
+        font-size: 0.76rem;
+        padding: 0.28rem 0.55rem;
+    }
+
+    .lesson-row-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.8rem;
+    }
+
+    .lesson-file-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.85rem;
+        min-width: 0;
+    }
+
+    .lesson-doc-icon {
+        width: 2rem;
+        height: 2rem;
+        border: 1px solid #c3dce6;
+        border-radius: 0.45rem;
+        color: #0b8ea7;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .lesson-doc-ext {
+        position: absolute;
+        bottom: -0.62rem;
+        font-size: 0.54rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: #0b8ea7;
+    }
+
+    .lesson-link {
+        color: #102b55;
+        text-decoration: none;
+        font-size: 1rem;
+        line-height: 1.25;
+        font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+    }
+
+    .lesson-link:hover {
+        text-decoration: underline;
+    }
+
+    .lesson-link.resource-tone {
+        color: #be930f;
+    }
+
+    .lesson-file-ext {
+        margin-left: 0.5rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #102443;
+    }
+
+    .lesson-meta {
+        font-size: 0.72rem;
+        color: #667085;
+        white-space: nowrap;
+    }
+    
+    /* Assessment Cards */
+    .assessment-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        transition: all 0.2s;
+    }
+    
+    .assessment-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+
+    .dropzone {
+        border: 2px dashed #94a3b8;
+        border-radius: 0.6rem;
+        padding: 1rem;
+        text-align: center;
+        background: #f8fafc;
+        color: #334155;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .dropzone.dragover {
+        border-color: #2563eb;
+        background: #eff6ff;
+    }
+    
+    .assessment-type {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .type-quiz { background-color: #dbeafe; color: #1e40af; }
+    .type-assignment { background-color: #fef3c7; color: #92400e; }
+    .type-cat { background-color: #dcfce7; color: #166534; }
+
+    .course-workspace {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        min-height: 70vh;
+    }
+
+    .workspace-hero {
+        background: linear-gradient(115deg, #0f3d77 0%, #1d4ed8 38%, #0ea5a4 100%);
+        color: #ffffff;
+        border-radius: 1rem;
+        padding: 1rem 1.1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 14px 30px rgba(29, 78, 216, 0.22);
+    }
+
+    .workspace-hero-title {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 800;
+    }
+
+    .workspace-hero-subtitle {
+        margin: 0.35rem 0 0;
+        opacity: 0.92;
+        font-size: 0.92rem;
+    }
+
+    .workspace-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 999px;
+        padding: 0.25rem 0.62rem;
+        font-size: 0.73rem;
+        font-weight: 700;
+        margin-top: 0.7rem;
+    }
+
+    .workspace-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .workspace-panel {
+        background: #ffffff;
+        border: 1px solid #dbe5f0;
+        border-radius: 0.95rem;
+        overflow: hidden;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+        opacity: 0;
+        transform: translateY(8px);
+        animation: panelEnter 0.45s ease forwards;
+    }
+
+    .workspace-panel:nth-child(1) { animation-delay: 0.03s; }
+    .workspace-panel:nth-child(2) { animation-delay: 0.08s; }
+    .workspace-panel:nth-child(3) { animation-delay: 0.13s; }
+    .workspace-panel:nth-child(4) { animation-delay: 0.18s; }
+
+    .panel-head {
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.7rem;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .panel-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 800;
+        color: #0f172a;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+
+    .panel-subtitle {
+        margin: 0.2rem 0 0;
+        color: #64748b;
+        font-size: 0.8rem;
+    }
+
+    .panel-body {
+        padding: 0.95rem;
+    }
+
+    .risk-legend {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-right: 0.6rem;
+        font-size: 0.73rem;
+        font-weight: 700;
+    }
+
+    .risk-dot {
+        width: 0.52rem;
+        height: 0.52rem;
+        border-radius: 999px;
+    }
+
+    .risk-dot-high { background: #ef4444; }
+    .risk-dot-medium { background: #f59e0b; }
+    .risk-dot-low { background: #10b981; }
+
+    .difficulty-table th {
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #0f3d77;
+        border-bottom-color: #dbe5f0;
+    }
+
+    .difficulty-table td {
+        font-size: 0.9rem;
+        border-bottom-color: #ecf1f7;
+    }
+
+    .students-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.9rem;
+    }
+
+    @media (min-width: 900px) {
+        .students-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 1280px) {
+        .workspace-grid {
+            grid-template-columns: 1.28fr 1fr;
+        }
+
+        .panel-lessons { grid-column: 1; grid-row: 1; }
+        .panel-assessments { grid-column: 1; grid-row: 2; }
+        .panel-students { grid-column: 2; grid-row: 1; }
+        .panel-difficulty { grid-column: 2; grid-row: 2; }
+    }
+
+    @keyframes panelEnter {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+
+    .stat-card-body {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+    }
+
+    .stat-icon {
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 0.65rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .stat-copy {
+        min-width: 0;
+    }
+
+    .stat-label,
+    .stat-value {
+        margin: 0;
+        line-height: 1.2;
+    }
+
+    .stat-label {
+        font-size: 0.86rem;
+        color: #64748b;
+    }
+
+    .stat-value {
+        margin-top: 0.25rem;
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .stat-icon-students { background: #dbeafe; color: #1d4ed8; }
+    .stat-icon-lessons { background: #f3e8ff; color: #7e22ce; }
+    .stat-icon-assessments { background: #dcfce7; color: #15803d; }
+    .stat-icon-hours { background: #fef9c3; color: #a16207; }
+
+    @media (min-width: 640px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 992px) {
+        .course-sidebar {
+            position: static;
+            max-height: none;
+        }
+    }
+
+    @media (min-width: 1400px) {
+        .stats-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 course-management-shell">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h3 class="mb-1 fw-bold"><i class="fas fa-layer-group text-primary me-2"></i>Course Management</h3>
+        <p class="text-muted mb-0">Lesson overview, assessments, student risk, and topic difficulty in one place.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button id="backToCoursesBtn" class="btn btn-outline-secondary hidden">
+            <i class="fas fa-arrow-left me-1"></i>Back to Course Cards
+        </button>
+        <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-primary">
+            <i class="fas fa-chart-pie me-1"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+<div class="course-grid">
+    <!-- Left Sidebar - Courses -->
+    <div class="bg-white shadow-sm course-sidebar">
+        <div class="p-4 border-b border-gray-200 sticky top-0 bg-white">
+            <h2 class="text-lg font-semibold text-gray-800 mb-3">
+                <i class="fas fa-book-open text-blue-600 mr-2"></i>
+                My Courses Overview
+            </h2>
+            <button id="addCourseBtn" class="btn btn-primary w-100">
+                <i class="fas fa-plus mr-2"></i>Create New Course
+            </button>
+        </div>
+        
+        <div class="p-2" id="courseList">
+            <!-- Populated by JavaScript -->
+            <div class="animate-pulse course-cards">
+                <div class="h-28 bg-gray-200 rounded"></div>
+                <div class="h-28 bg-gray-200 rounded"></div>
+                <div class="h-28 bg-gray-200 rounded"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="course-workspace p-4 md:p-6">
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-5">
+            {% include "components/empty_state.html" with icon="fa-book" title="Select a course to manage" message="Choose a course from the sidebar or create a new one to get started." action_url="javascript:document.getElementById('addCourseBtn').click();" action_text="Create New Course" %}
+        </div>
+        
+        <!-- Course Content (hidden by default) -->
+        <div id="courseContent" class="hidden">
+            <!-- Course Header -->
+            <div class="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 mb-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900" id="courseTitle"></h1>
+                    <p class="text-gray-600 mt-1" id="courseDescription"></p>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Enrollment Key: <span id="courseEnrollmentKey" class="font-semibold text-gray-700">-</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="border-b border-gray-200 mb-6 overflow-x-auto">
+                <nav class="flex space-x-6 min-w-max">
+                    <button class="tab-btn active px-1 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600" data-tab="lessons">
+                        <i class="fas fa-list mr-2"></i>Lesson Overview
+                    </button>
+                    <button class="tab-btn px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="assessments">
+                        <i class="fas fa-pencil-alt mr-2"></i>Assessments
+                    </button>
+                    <button class="tab-btn px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="students">
+                        <i class="fas fa-users mr-2"></i>Risk Students Overview
+                    </button>
+                    <button class="tab-btn px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="difficulty">
+                        <i class="fas fa-chart-line mr-2"></i>Lesson Difficulty Analyzer
+                    </button>
+                </nav>
+            </div>
+            
+            <!-- Lessons Tab -->
+            <div id="lessonsTab" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium">Lesson Overview</h3>
+                    <button id="addModuleBtn" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus mr-1"></i>Add Module
+                    </button>
+                </div>
+
+                <div class="module-container mb-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <h4 class="font-medium mb-0"><i class="fas fa-file-upload text-blue-600 mr-2"></i>Quick File Upload</h4>
+                        <span class="text-xs text-gray-500">Drag and drop a file to add as lesson content</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Module</label>
+                            <select id="quickUploadModule" class="w-full border rounded px-3 py-2">
+                                <option value="">Add a module first</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Lesson Title</label>
+                            <input id="quickUploadTitle" type="text" class="w-full border rounded px-3 py-2" placeholder="e.g. Week 1 Notes">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Duration (minutes)</label>
+                            <input id="quickUploadMinutes" type="number" value="15" class="w-full border rounded px-3 py-2">
+                        </div>
+                    </div>
+                    <div id="quickUploadDropzone" class="dropzone mb-2">
+                        <i class="fas fa-cloud-upload-alt mr-2"></i>Drop file here or click to choose
+                    </div>
+                    <input type="file" id="quickUploadFile" class="hidden">
+                    <p id="quickUploadFileName" class="text-xs text-gray-500 mb-3">No file selected</p>
+                    <button id="quickUploadBtn" class="btn btn-sm btn-primary">
+                        <i class="fas fa-upload mr-1"></i>Add File to Lesson Overview
+                    </button>
+                </div>
+                
+                <div id="modulesContainer" class="space-y-4">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Assessments Tab -->
+            <div id="assessmentsTab" class="tab-content hidden">
+                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+                    <h3 class="text-lg font-medium">Assessments</h3>
+                    <div class="space-x-2">
+                        <button id="addQuizBtn" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus mr-1"></i>Quiz
+                        </button>
+                        <button id="addAssignmentBtn" class="btn btn-sm btn-success">
+                            <i class="fas fa-plus mr-1"></i>Assignment
+                        </button>
+                        <button id="addCatBtn" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-plus mr-1"></i>CAT
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="assessmentsList">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Risk Students Tab -->
+            <div id="studentsTab" class="tab-content hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4" id="studentsList">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Difficulty Tab -->
+            <div id="difficultyTab" class="tab-content hidden">
+                <div class="overflow-x-auto">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light">
+                                                        <tr>
+                                <th>Lesson</th>
+                                <th>Difficulty</th>
+                                <th>Failure Rate</th>
+                                <th>
+                                    Attempt Intensity
+                                    <i class="fas fa-info-circle text-muted ms-1"
+                                       title="Average completed quiz attempts per student, normalized so 3 attempts per student = 100%."></i>
+                                </th>
+                                <th>
+                                    Access Coverage
+                                    <i class="fas fa-info-circle text-muted ms-1"
+                                       title="Percent of active students in this course who accessed the lesson at least once."></i>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="difficultyList">
+                            <tr><td colspan="5" class="text-muted text-center py-3">Loading difficulty data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Course Modal -->
+<div id="courseModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium" id="courseModalTitle">Create New Course</h3>
+        </div>
+        <div class="px-6 py-4">
+            <form id="courseForm">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input type="text" id="courseTitleInput" required class="w-full border rounded px-3 py-2">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="courseDescriptionInput" rows="3" class="w-full border rounded px-3 py-2"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button id="cancelCourseBtn" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button id="saveCourseBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Module Modal -->
+<div id="moduleModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium">Add Module</h3>
+        </div>
+        <div class="px-6 py-4">
+            <form id="moduleForm">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Module Title</label>
+                    <input type="text" id="moduleTitle" required class="w-full border rounded px-3 py-2">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="moduleDescription" rows="3" class="w-full border rounded px-3 py-2"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button id="cancelModuleBtn" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button id="saveModuleBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Lesson Modal -->
+<div id="lessonModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium">Add Lesson</h3>
+        </div>
+        <div class="px-6 py-4">
+            <form id="lessonForm">
+                <input type="hidden" id="lessonModuleId">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Lesson Title</label>
+                    <input type="text" id="lessonTitle" required class="w-full border rounded px-3 py-2">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Content Type</label>
+                    <select id="lessonType" class="w-full border rounded px-3 py-2">
+                        <option value="VIDEO">Video</option>
+                        <option value="TEXT">Text Article</option>
+                        <option value="QUIZ">Quiz</option>
+                        <option value="RESOURCE">Resource File</option>
+                    </select>
+                </div>
+                <div class="mb-4" id="contentField">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                    <textarea id="lessonContent" rows="5" class="w-full border rounded px-3 py-2"></textarea>
+                </div>
+                <div class="mb-4" id="urlField" style="display: none;">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Video URL</label>
+                    <input type="url" id="lessonUrl" class="w-full border rounded px-3 py-2">
+                </div>
+                <div class="mb-4" id="fileField" style="display: none;">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Resource File</label>
+                    <div id="lessonDropzone" class="dropzone">
+                        <i class="fas fa-cloud-upload-alt mr-2"></i>Drag and drop file here, or click to choose
+                    </div>
+                    <input type="file" id="lessonFile" class="hidden">
+                    <p class="text-xs text-gray-500 mt-2" id="lessonFileName">No file selected</p>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Duration (minutes)</label>
+                    <input type="number" id="lessonMinutes" value="15" class="w-full border rounded px-3 py-2">
+                </div>
+            </form>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button id="cancelLessonBtn" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button id="saveLessonBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Assessment Modal -->
+<div id="assessmentModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium" id="assessmentModalTitle">Add Assessment</h3>
+        </div>
+        <div class="px-6 py-4">
+            <form id="assessmentForm">
+                <input type="hidden" id="assessmentType">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Lesson</label>
+                    <select id="assessmentLesson" class="w-full border rounded px-3 py-2"></select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input type="text" id="assessmentTitle" required class="w-full border rounded px-3 py-2">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="assessmentDescription" rows="3" class="w-full border rounded px-3 py-2"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Passing Score (%)</label>
+                    <input type="number" id="assessmentPassingScore" value="70" class="w-full border rounded px-3 py-2">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Question</label>
+                    <textarea id="assessmentQuestionText" rows="2" class="w-full border rounded px-3 py-2" placeholder="Enter question text"></textarea>
+                </div>
+                <div class="grid grid-cols-1 gap-2">
+                    <input type="text" id="answerOption1" class="w-full border rounded px-3 py-2" placeholder="Option 1">
+                    <input type="text" id="answerOption2" class="w-full border rounded px-3 py-2" placeholder="Option 2">
+                    <input type="text" id="answerOption3" class="w-full border rounded px-3 py-2" placeholder="Option 3">
+                    <input type="text" id="answerOption4" class="w-full border rounded px-3 py-2" placeholder="Option 4">
+                </div>
+                <div class="mt-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Correct Answer</label>
+                    <select id="correctAnswerIndex" class="w-full border rounded px-3 py-2">
+                        <option value="1">Option 1</option>
+                        <option value="2">Option 2</option>
+                        <option value="3">Option 3</option>
+                        <option value="4">Option 4</option>
+                    </select>
+                </div>
+                <p class="text-xs text-blue-700 mt-3">
+                    <i class="fas fa-info-circle mr-1"></i>Auto-grading uses the correct answer selected above.
+                </p>
+                <div id="catWizard" class="mt-3 hidden">
+                    <div class="p-3 rounded border border-blue-200 bg-blue-50">
+                        <p class="text-xs text-blue-800 mb-2">
+                            <strong>CAT Wizard:</strong> Set CAT duration and optionally copy questions from an existing quiz.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">CAT Duration (minutes)</label>
+                                <input type="number" id="catDurationMinutes" value="30" class="w-full border rounded px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Copy from Existing Quiz</label>
+                                <select id="catSourceQuiz" class="w-full border rounded px-3 py-2">
+                                    <option value="">Start from scratch</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" id="catCopyQuestions" class="rounded border-gray-300">
+                                Copy all questions from selected quiz
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-2 mb-0">
+                            Tip: question section below is optional. You can save CAT details first, then add questions later.
+                        </p>
+                    </div>
+                </div>
+                <div id="assessmentNonQuizHint" class="mt-3 text-xs text-amber-700 hidden">
+                    Assignment/CAT full workflow is not configured in this API. Use Quiz for auto-grading.
+                </div>
+            </form>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button id="cancelAssessmentBtn" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button id="saveAssessmentBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="{% static 'dashboard/js/course-management-v2.js' %}?v=20260329-01"></script>
+{% endblock %}
+

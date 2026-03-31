@@ -1,0 +1,16 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+    {% include "components/breadcrumbs.html" with breadcrumbs=breadcrumbs %}
+
+    <div style="display: grid; grid-template-columns: 1fr 360px; gap: 24px;">
+        <div>
+            {% include "components/student_progress_table.html" with course=course %}
+            {% include "components/competency_heatmap.html" %}
+        </div>
+        <aside>
+            {% include "components/course_health_badge.html" with course=course %}
+            {% include "components/csv_import_form.html" with course=course %}
+        </aside>
+    </div>
+{% endblock %}

@@ -1,0 +1,421 @@
+{# Lesson Editor with Native HTML Content #}
+{# Phase 1: Native Content & Telemetry #}
+{# Usage: {% include "components/lesson_editor.html" with lesson=lesson_obj form=lesson_form %} #}
+
+<style>
+    .lesson-editor-container {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+
+    .lesson-editor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        border-bottom: 2px solid #f0f0f0;
+        padding-bottom: 16px;
+    }
+
+    .lesson-editor-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .lesson-editor-meta {
+        display: flex;
+        gap: 24px;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .lesson-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .lesson-meta-label {
+        font-weight: 500;
+    }
+
+    .editor-toolbar {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .editor-btn {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .editor-btn:hover {
+        background: #f0f0f0;
+        border-color: #999;
+    }
+
+    .editor-btn.active {
+        background: #0066cc;
+        color: white;
+        border-color: #0066cc;
+    }
+
+    .editor-btn-separator {
+        width: 1px;
+        height: 20px;
+        background: #dee2e6;
+        margin: 0 4px;
+    }
+
+    .editor-content {
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 16px;
+        min-height: 400px;
+        background: white;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #333;
+    }
+
+    .editor-content:focus {
+        outline: 2px solid #0066cc;
+        outline-offset: 0;
+    }
+
+    .editor-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .stat-box {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #666;
+        text-transform: uppercase;
+    }
+
+    .stat-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: #333;
+    }
+
+    .stat-unit {
+        font-size: 12px;
+        color: #999;
+        font-weight: normal;
+    }
+
+    .editor-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        border-top: 1px solid #f0f0f0;
+        padding-top: 16px;
+    }
+
+    .btn-primary {
+        background: #0066cc;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+
+    .btn-primary:hover {
+        background: #0052a3;
+    }
+
+    .btn-secondary {
+        background: #f0f0f0;
+        color: #333;
+        border: 1px solid #dee2e6;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+
+    .btn-secondary:hover {
+        background: #e9ecef;
+    }
+
+    .content-type-selector {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .content-type-btn {
+        padding: 8px 16px;
+        border: 2px solid #e9ecef;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
+
+    .content-type-btn:hover {
+        border-color: #0066cc;
+    }
+
+    .content-type-btn.active {
+        border-color: #0066cc;
+        background: #e6f0ff;
+        color: #0066cc;
+        font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+        .lesson-editor-container {
+            padding: 16px;
+        }
+
+        .editor-content {
+            min-height: 300px;
+        }
+
+        .editor-toolbar {
+            flex-direction: column;
+        }
+
+        .editor-stats {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .editor-actions {
+            flex-direction: column;
+        }
+
+        .btn-primary, .btn-secondary {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="lesson-editor-container">
+    <div class="lesson-editor-header">
+        <div>
+            <div class="lesson-editor-title">{{ lesson.title }}</div>
+            <div class="lesson-editor-meta">
+                <div class="lesson-meta-item">
+                    <span class="lesson-meta-label">Module:</span>
+                    <span>{{ lesson.module.name }}</span>
+                </div>
+                <div class="lesson-meta-item">
+                    <span class="lesson-meta-label">Type:</span>
+                    <span>{{ lesson.get_content_type_display }}</span>
+                </div>
+            </div>
+        </div>
+        <div>
+            {% if lesson.estimated_minutes %}
+                <div class="lesson-meta-item">
+                    <span class="lesson-meta-label">Estimated Duration:</span>
+                    <span>{{ lesson.estimated_minutes }} min</span>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <form id="lesson-editor-form" method="post" action="{% url 'api:lesson-detail' lesson.id %}">
+        {% csrf_token %}
+
+        <div class="content-type-selector">
+            <label style="display: flex; align-items: center; gap: 8px;">
+                <input type="radio" name="content_type" value="TEXT" {% if lesson.content_type == 'TEXT' %}checked{% endif %}>
+                📝 Text Content
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px;">
+                <input type="radio" name="content_type" value="VIDEO" {% if lesson.content_type == 'VIDEO' %}checked{% endif %}>
+                🎥 Video
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px;">
+                <input type="radio" name="content_type" value="RESOURCE" {% if lesson.content_type == 'RESOURCE' %}checked{% endif %}>
+                📎 File Resource
+            </label>
+        </div>
+
+        <div class="editor-toolbar">
+            <button type="button" class="editor-btn" data-command="bold" title="Bold (Ctrl+B)">
+                <strong>B</strong>
+            </button>
+            <button type="button" class="editor-btn" data-command="italic" title="Italic (Ctrl+I)">
+                <em>I</em>
+            </button>
+            <button type="button" class="editor-btn" data-command="underline" title="Underline (Ctrl+U)">
+                <u>U</u>
+            </button>
+            <div class="editor-btn-separator"></div>
+            <button type="button" class="editor-btn" data-command="insertUnorderedList" title="Bullet List">
+                ∙ List
+            </button>
+            <button type="button" class="editor-btn" data-command="insertOrderedList" title="Numbered List">
+                1. List
+            </button>
+            <div class="editor-btn-separator"></div>
+            <button type="button" class="editor-btn" data-command="createLink" title="Add Link">
+                🔗 Link
+            </button>
+            <button type="button" class="editor-btn" data-command="insertImage" title="Insert Image">
+                🖼 Image
+            </button>
+            <div class="editor-btn-separator"></div>
+            <button type="button" class="editor-btn" data-command="removeFormat" title="Clear Formatting">
+                ✗ Clear
+            </button>
+        </div>
+
+        <div id="lesson-editor-content" class="editor-content" contenteditable="true">
+            {% if lesson.content_html %}
+                {{ lesson.content_html|safe }}
+            {% else %}
+                <p>Start typing your lesson content here...</p>
+            {% endif %}
+        </div>
+
+        <input type="hidden" id="content-html-hidden" name="content_html" value="{{ lesson.content_html|escapejs }}">
+
+        <div class="editor-stats">
+            <div class="stat-box">
+                <span class="stat-label">Word Count</span>
+                <span class="stat-value"><span id="word-count">0</span><span class="stat-unit"> words</span></span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Character Count</span>
+                <span class="stat-value"><span id="char-count">0</span><span class="stat-unit"> chars</span></span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Estimated Duration</span>
+                <span class="stat-value"><span id="estimated-duration">0</span><span class="stat-unit"> min</span></span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Last Saved</span>
+                <span class="stat-value"><span id="last-saved">Just now</span></span>
+            </div>
+        </div>
+
+        <div class="editor-actions">
+            <button type="submit" class="btn-primary">Save Lesson</button>
+            <button type="button" class="btn-secondary" onclick="window.history.back()">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    const editor = document.getElementById('lesson-editor-content');
+    const hiddenInput = document.getElementById('content-html-hidden');
+    const wordCountSpan = document.getElementById('word-count');
+    const charCountSpan = document.getElementById('char-count');
+    const durationSpan = document.getElementById('estimated-duration');
+    const form = document.getElementById('lesson-editor-form');
+
+    // Toolbar functionality
+    document.querySelectorAll('[data-command]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const command = btn.dataset.command;
+            
+            if (command === 'createLink') {
+                const url = prompt('Enter URL:');
+                if (url) document.execCommand('createLink', false, url);
+            } else if (command === 'insertImage') {
+                const url = prompt('Enter image URL:');
+                if (url) document.execCommand('insertImage', false, url);
+            } else {
+                document.execCommand(command, false, null);
+            }
+            editor.focus();
+        });
+    });
+
+    // Update stats on input
+    function updateStats() {
+        const html = editor.innerHTML;
+        const text = editor.innerText;
+        const words = text.trim().split(/\s+/).filter(w => w).length;
+        const chars = text.length;
+        const estimatedMinutes = Math.ceil(words / 200);
+
+        wordCountSpan.textContent = words;
+        charCountSpan.textContent = chars;
+        durationSpan.textContent = Math.max(estimatedMinutes, 1);
+        hiddenInput.value = html;
+    }
+
+    editor.addEventListener('input', updateStats);
+    editor.addEventListener('paste', () => setTimeout(updateStats, 100));
+
+    // Form submission
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        updateStats();
+
+        const formData = new FormData(form);
+        try {
+            const response = await fetch(form.action, {
+                method: 'PUT',
+                headers: { 'X-CSRFToken': formData.get('csrfmiddlewaretoken') },
+                body: formData
+            });
+
+            if (response.ok) {
+                toastNotify('Lesson saved successfully', 'success');
+                document.getElementById('last-saved').textContent = 'Just now';
+            } else {
+                toastNotify('Error saving lesson', 'error');
+            }
+        } catch (error) {
+            toastNotify('Network error. Please try again.', 'error');
+        }
+    });
+
+    // Initialize stats
+    updateStats();
+
+    // Keyboard shortcuts
+    editor.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit'));
+        }
+    });
+</script>

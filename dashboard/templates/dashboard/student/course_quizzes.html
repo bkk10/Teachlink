@@ -1,0 +1,236 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Course Content{% endblock %}
+
+{% block extra_css %}
+<style>
+    .quiz-shell {
+        background: linear-gradient(120deg, #e6efff 0%, #f7fbff 100%);
+        border: 1px solid #dbe8ff;
+        border-radius: 18px;
+    }
+    .quiz-card {
+        border: 1px solid #d9e2f2;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+    }
+    .quiz-chip {
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        border-radius: 999px;
+        padding: 0.22rem 0.62rem;
+    }
+    .chip-success { background: #e9f9ef; color: #147a3f; }
+    .chip-neutral { background: #eef2ff; color: #2847a3; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <section class="quiz-shell p-4 p-lg-5 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <p class="text-uppercase small fw-semibold text-primary mb-2">Course Content</p>
+                <h2 class="fw-bold mb-1">{{ course.title }}</h2>
+                <p class="text-muted mb-0">Open lessons, complete work, and take published assessments.</p>
+            </div>
+            <a href="{% url 'dashboard_courses' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i>Back to My Courses
+            </a>
+        </div>
+    </section>
+
+    {% if lesson_rows %}
+    <div class="card dashboard-card mb-4">
+        <div class="card-header bg-white">
+            <h6 class="mb-0 fw-bold">Course Lessons</h6>
+        </div>
+        <div class="card-body">
+            <div class="list-group list-group-flush">
+                {% for row in lesson_rows %}
+                <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <strong>
+                            <a href="{% url 'open_lesson_material' row.lesson.id %}" class="text-decoration-none">{{ row.lesson.title }}</a>
+                        </strong>
+                        <br><small class="text-muted">{{ row.lesson.module.title }} - {{ row.lesson.estimated_minutes }} min</small>
+                        <div class="mt-1">
+                            {% if row.quiz_available %}
+                            <span class="badge text-bg-primary">Quiz Ready</span>
+                            {% elif row.quiz_id %}
+                            <span class="badge text-bg-secondary">Quiz Coming Soon</span>
+                            {% else %}
+                            <span class="badge text-bg-light text-dark border">No Quiz</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        {% if row.completed %}
+                            <span class="badge bg-success"><i class="fas fa-check me-1"></i>Completed</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Not Started</span>
+                        {% endif %}
+                        <a href="{% url 'open_lesson_material' row.lesson.id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-play me-1"></i>Open Lesson
+                        </a>
+                        {% if not row.completed %}
+                        <button class="btn btn-sm btn-outline-success mark-lesson-complete-btn" data-lesson-id="{{ row.lesson.id }}">
+                            <i class="fas fa-check me-1"></i>Mark Complete
+                        </button>
+                        {% endif %}
+                        {% if row.quiz_available %}
+                        <a href="{% url 'student_quiz_attempts' row.quiz_id %}?take=1" class="btn btn-sm btn-primary">
+                            <i class="fas fa-pen me-1"></i>Take Quiz
+                        </a>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline-warning report-difficulty-btn" data-course-id="{{ course.id }}" data-lesson-id="{{ row.lesson.id }}">
+                            <i class="fas fa-flag me-1"></i>Report Difficulty
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="mb-4">
+        {% include "components/empty_state.html" with icon="fa-file-lines" title="No lessons available" message="Your teacher has not published any lessons for this course yet." %}
+    </div>
+    {% endif %}
+
+    {% if quiz_rows %}
+    <div class="row g-4">
+        {% for row in quiz_rows %}
+        <div class="col-12 col-xl-6">
+            <article class="quiz-card h-100 p-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                    <h5 class="fw-bold mb-0">{{ row.quiz.title }}</h5>
+                    {% if row.attempts_used > 0 %}
+                        <span class="quiz-chip chip-success">{{ row.status_label }}</span>
+                    {% else %}
+                        <span class="quiz-chip chip-neutral">{{ row.status_label }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="text-muted small mb-3">
+                    <div><i class="fas fa-layer-group me-1"></i>{{ row.quiz.lesson.module.title }}</div>
+                    <div><i class="fas fa-book-open me-1"></i>{{ row.quiz.lesson.title }}</div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="border rounded-3 p-2">
+                            <div class="small text-muted">Attempts</div>
+                            <div class="fw-semibold">{{ row.attempts_used }} / {{ row.quiz.max_attempts }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded-3 p-2">
+                            <div class="small text-muted">Best Score</div>
+                            <div class="fw-semibold">{{ row.final_score|floatformat:2 }}%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        {% if row.latest_attempt and row.latest_attempt.submitted_at %}
+                            Last attempt: {{ row.latest_attempt.submitted_at|date:"M d, Y g:i A" }}
+                        {% else %}
+                            No attempts submitted yet.
+                        {% endif %}
+                    </small>
+                    {% if row.can_take %}
+                    <a href="{% url 'student_quiz_attempts' row.quiz.id %}?take=1" class="btn btn-primary">
+                        Take Quiz
+                    </a>
+                    {% else %}
+                    <a href="{% url 'student_quiz_attempts' row.quiz.id %}" class="btn btn-outline-primary">
+                        View Attempts
+                    </a>
+                    {% endif %}
+                </div>
+            </article>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% include "components/empty_state.html" with icon="fa-clipboard-list" title="No assessments published" message="Your teacher has not published any assessments for this course yet." %}
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCSRFToken() {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, 10) === 'csrftoken=') {
+                cookieValue = decodeURIComponent(cookie.substring(10));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function reportDifficulty(courseId, lessonId) {
+    const reason = prompt("Please describe the difficulty you're facing:");
+    if (!reason) return;
+    $.ajax({
+        url: "{% url 'student_api' %}",
+        method: "POST",
+        contentType: "application/json",
+        headers: { "X-CSRFToken": getCSRFToken() },
+        data: JSON.stringify({
+            action: "report_difficulty",
+            course_id: courseId,
+            lesson_id: lessonId,
+            reason: reason
+        }),
+        success: function() {
+            alert("Difficulty report submitted to your teacher.");
+        },
+        error: function(xhr) {
+            alert("Could not submit report right now.");
+            console.error(xhr.responseText || xhr.statusText);
+        }
+    });
+}
+
+$(function() {
+    $(document).on("click", ".mark-lesson-complete-btn", function() {
+        const button = $(this);
+        const lessonId = button.data("lesson-id");
+        if (!lessonId) return;
+
+        $.ajax({
+            url: `/api/courses/lessons/${lessonId}/complete/`,
+            method: "POST",
+            contentType: "application/json",
+            headers: { "X-CSRFToken": getCSRFToken() },
+            data: JSON.stringify({}),
+            success: function() {
+                button.removeClass("btn-outline-success").addClass("btn-success");
+                button.html('<i class="fas fa-check me-1"></i>Completed');
+                button.prop("disabled", true);
+            },
+            error: function(xhr) {
+                alert("Could not mark lesson complete. Please try again.");
+                console.error(xhr.responseText || xhr.statusText);
+            }
+        });
+    });
+
+    $(document).on("click", ".report-difficulty-btn", function() {
+        reportDifficulty($(this).data("course-id"), $(this).data("lesson-id"));
+    });
+});
+</script>
+{% endblock %}

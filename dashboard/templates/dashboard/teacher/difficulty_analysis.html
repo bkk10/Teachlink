@@ -1,0 +1,251 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}Topic Difficulty Analysis{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-card { border: 0; box-shadow: 0 0.5rem 1.25rem rgba(15, 23, 42, 0.08); }
+    .section-title { font-weight: 700; color: #0f172a; }
+    .difficulty-badge { font-size: 0.85rem; font-weight: 600; }
+    .lesson-row { border-bottom: 1px solid #e2e8f0; padding: 1rem 0; }
+    .lesson-row:last-child { border-bottom: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h3 class="mb-1 fw-bold">Topic Difficulty Analysis</h3>
+            <p class="text-muted mb-0">Identify lessons where students struggle most. Rank by failure rate, access patterns, and repeat attempts.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'dashboard_courses' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Course Filter -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-body">
+            <label class="form-label fw-semibold">Filter by Course (Optional)</label>
+            <select id="courseFilter" class="form-select">
+                <option value="">All Courses</option>
+                {% for course in courses %}
+                <option value="{{ course.id }}">{{ course.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Difficulty Distribution Chart -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card dashboard-card h-100">
+                <div class="card-body">
+                    <h6 class="section-title mb-3">Distribution of Lesson Difficulty</h6>
+                    <div style="height: 280px;">
+                        <canvas id="difficultyDistributionChart"></canvas>
+                    </div>
+                    <div id="distributionInsight" class="small text-muted mt-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card dashboard-card h-100">
+                <div class="card-body">
+                    <h6 class="section-title mb-3">Key Metrics Summary</h6>
+                    <div id="metricsContainer">
+                        <div class="text-muted">Loading metrics...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hardest Topics Table -->
+    <div class="card dashboard-card">
+        <div class="card-header bg-white">
+            <h6 class="mb-1 section-title">Hardest Topics (Ranked by Difficulty Score)</h6>
+            <p class="small text-muted mb-0">Difficulty combines failure rate (40%), repeated attempts (35%), and repeated access (25%). Lower scores = easier topics.</p>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Lesson Name</th>
+                        <th>Course</th>
+                        <th>Difficulty Score</th>
+                        <th>Failure Rate</th>
+                        <th>Attempt Intensity</th>
+                        <th>Access Count</th>
+                        <th>Coverage %</th>
+                    </tr>
+                </thead>
+                <tbody id="difficultyTableBody">
+                    <tr><td colspan="8" class="text-muted text-center py-3">Loading lesson data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let difficultyChartInstance = null;
+
+$(function() {
+    $("#courseFilter").on("change", function() {
+        loadDifficultyData();
+    });
+    loadDifficultyData();
+});
+
+function loadDifficultyData() {
+    const courseId = $("#courseFilter").val();
+    const url = new URL("{% url 'difficulty_api' %}", window.location.origin);
+    if (courseId) url.searchParams.set('course_id', courseId);
+
+    $.ajax({
+        url: url.toString(),
+        method: "GET",
+        success: function(data) {
+            renderDistribution(data.distribution || []);
+            renderMetrics(data);
+            renderDifficultyTable(data.hardest_lessons || []);
+            renderDistributionInsight(data.distribution || []);
+        },
+        error: function(xhr) {
+            console.error("Difficulty load failed:", xhr.status);
+            $("#difficultyTableBody").html('<tr><td colspan="8" class="text-danger text-center py-3">Unable to load difficulty data.</td></tr>');
+        }
+    });
+}
+
+function renderDistribution(distribution) {
+    const canvas = document.getElementById("difficultyDistributionChart");
+    if (!canvas) return;
+    if (difficultyChartInstance) difficultyChartInstance.destroy();
+
+    const colors = [];
+    const labels = [];
+    const data = [];
+
+    distribution.forEach(item => {
+        labels.push(item.label);
+        data.push(item.count);
+        if (item.level === 'HIGH') colors.push('#ef4444');
+        else if (item.level === 'MEDIUM') colors.push('#f59e0b');
+        else colors.push('#10b981');
+    });
+
+    difficultyChartInstance = new Chart(canvas, {
+        type: "doughnut",
+        data: {
+            labels: labels.length ? labels : ["No data"],
+            datasets: [{
+                data: data.length ? data : [1],
+                backgroundColor: colors.length ? colors : ["#cbd5e1"]
+            }]
+        },
+        options: { 
+            maintainAspectRatio: false, 
+            plugins: { legend: { position: "bottom" } } 
+        }
+    });
+}
+
+function renderDistributionInsight(distribution) {
+    if (!distribution.length) {
+        $("#distributionInsight").text("No difficulty data available yet.");
+        return;
+    }
+    const total = distribution.reduce((sum, item) => sum + item.count, 0);
+    const high = distribution.find(d => d.level === 'HIGH');
+    const highCount = high ? high.count : 0;
+    const highPct = total > 0 ? Math.round((highCount / total) * 100) : 0;
+    $("#distributionInsight").text(
+        `${highCount} of ${total} lessons (${highPct}%) are marked as high difficulty. These need attention and review.`
+    );
+}
+
+function renderMetrics(data) {
+    const totalAnalyzed = data.total_analyzed || 0;
+    const distribution = data.distribution || [];
+    const hardestCount = (data.hardest_lessons || []).length;
+    
+    const avgFailureRate = calculateAverageFailure(data.hardest_lessons || []);
+
+    const html = `
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="p-2 border rounded small">
+                    <div class="text-muted">Total Analyzed</div>
+                    <div class="fs-5 fw-bold">${totalAnalyzed}</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="p-2 border rounded small">
+                    <div class="text-muted">High Difficulty</div>
+                    <div class="fs-5 fw-bold">${distribution.find(d => d.level === 'HIGH')?.count || 0}</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="p-2 border rounded small">
+                    <div class="text-muted">Avg Failure Rate</div>
+                    <div class="fs-5 fw-bold">${Math.round(avgFailureRate)}%</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="p-2 border rounded small">
+                    <div class="text-muted">Top Topics</div>
+                    <div class="fs-5 fw-bold">${hardestCount}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    $("#metricsContainer").html(html);
+}
+
+function calculateAverageFailure(lessons) {
+    if (!lessons.length) return 0;
+    const sum = lessons.reduce((acc, l) => acc + (l.failure_rate || 0), 0);
+    return (sum / lessons.length) * 100;
+}
+
+function renderDifficultyTable(lessons) {
+    if (!lessons.length) {
+        $("#difficultyTableBody").html('<tr><td colspan="8" class="text-muted text-center py-3">No lessons analyzed yet.</td></tr>');
+        return;
+    }
+
+    const html = lessons.map((lesson, index) => {
+        const diffClass = lesson.difficulty_level === 'HIGH' ? 'danger' : 
+                         (lesson.difficulty_level === 'MEDIUM' ? 'warning' : 'success');
+        return `
+            <tr>
+                <td><strong>${index + 1}</strong></td>
+                <td>${lesson.lesson_title}</td>
+                <td>${lesson.course_title}</td>
+                <td>
+                    <div class="d-flex align-items-center gap-2">
+                        <strong>${Number(lesson.difficulty_score * 100).toFixed(0)}</strong>
+                        <span class="badge text-bg-${diffClass} difficulty-badge">${lesson.difficulty_level}</span>
+                    </div>
+                </td>
+                <td><strong>${Math.round(lesson.failure_rate * 100)}%</strong></td>
+                <td>${Number(lesson.attempt_intensity * 100).toFixed(0)}%</td>
+                <td>${lesson.access_count}</td>
+                <td>${Number(lesson.access_coverage_pct).toFixed(1)}%</td>
+            </tr>
+        `;
+    }).join("");
+    $("#difficultyTableBody").html(html);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,610 @@
+<h1 id="auto-feature-documentation">Auto Feature Documentation</h1>
+<p>Generated from Python module/class/function docstrings and tagged
+comments.</p>
+<ul>
+<li>Generated: 2026-03-29 21:28 UTC</li>
+<li>Files scanned: 62</li>
+<li>Files with extracted feature docs: 35</li>
+</ul>
+<h2 id="how-to-improve-this-output">How To Improve This Output</h2>
+<ul>
+<li>Add meaningful docstrings to modules, views, services, and
+models.</li>
+<li>Add tagged comments like <code># FEATURE: ...</code> for key
+capabilities.</li>
+<li>Re-run this script after code updates.</li>
+</ul>
+<h2 id="analyticsmodels.py"><code>analytics/models.py</code></h2>
+<p><strong>Module:</strong> Analytics and Risk Detection Models for
+TeachLink</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>RiskHistory</code>: Historical tracking of student risk
+scores</li>
+<li><code>EngagementMetrics</code>: Detailed engagement tracking for
+students</li>
+<li><code>LessonDifficulty</code>: Track lesson difficulty based on
+student performance</li>
+<li><code>Alert</code>: System-generated alerts for teachers
+<ul>
+<li><code>acknowledge</code>: Mark alert as acknowledged</li>
+<li><code>resolve</code>: Mark alert as resolved</li>
+</ul></li>
+<li><code>InterventionLog</code>: Track teacher interventions and their
+effectiveness
+<ul>
+<li><code>calculate_improvement</code>: Calculate improvement percentage
+based on risk scores</li>
+</ul></li>
+<li><code>LessonInteraction</code>: Track student interactions with
+lessons</li>
+</ul>
+<h2
+id="analyticsscriptstest_risk_engine.py"><code>analytics/scripts/test_risk_engine.py</code></h2>
+<p><strong>Module:</strong> Test the Risk Engine with our existing test
+data</p>
+<h2
+id="analyticsscriptstest_services.py"><code>analytics/scripts/test_services.py</code></h2>
+<p><strong>Module:</strong> Quick test script for analytics services</p>
+<p><strong>Functions</strong></p>
+<ul>
+<li><code>test_risk_engine</code>: Test if risk engine can calculate
+risk scores</li>
+<li><code>test_alert_generation</code>: Test if alerts are being
+generated</li>
+<li><code>test_difficulty_analyzer</code>: Test difficulty analysis</li>
+</ul>
+<h2
+id="analyticsservicesalert_generator.py"><code>analytics/services/alert_generator.py</code></h2>
+<p><strong>Module:</strong> Alert Generator Service</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>AlertGenerator</code>: Generates alerts based on risk scores
+and behavioral patterns
+<ul>
+<li><code>check_and_generate_alerts</code>: Check for conditions that
+should trigger alerts</li>
+<li><code>get_active_alerts</code>: Get all active alerts, optionally
+filtered</li>
+<li><code>resolve_old_alerts</code>: Auto-resolve alerts that are older
+than specified days</li>
+</ul></li>
+</ul>
+<h2
+id="analyticsservicescache_services.py"><code>analytics/services/cache_services.py</code></h2>
+<p><strong>Module:</strong> Redis Caching Service for TeachLink</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>CacheService</code>: Service for managing Redis cache
+<ul>
+<li><code>get_key</code>: Generate cache key</li>
+<li><code>get</code>: Get value from cache</li>
+<li><code>set</code>: Set value in cache with TTL</li>
+<li><code>delete</code>: Delete value from cache</li>
+<li><code>delete_pattern</code>: Delete all keys matching pattern</li>
+<li><code>get_or_set</code>: Get from cache or execute function and
+cache result</li>
+<li><code>clear_user_cache</code>: Clear all cache entries for a
+user</li>
+<li><code>clear_course_cache</code>: Clear all cache entries for a
+course</li>
+</ul></li>
+<li><code>DashboardCache</code>: Cache management for dashboard data
+<ul>
+<li><code>get_teacher_dashboard</code>: Get cached teacher
+dashboard</li>
+<li><code>set_teacher_dashboard</code>: Cache teacher dashboard</li>
+<li><code>invalidate_teacher_dashboard</code>: Invalidate teacher
+dashboard cache</li>
+<li><code>get_student_dashboard</code>: Get cached student
+dashboard</li>
+<li><code>set_student_dashboard</code>: Cache student dashboard</li>
+<li><code>invalidate_student_dashboard</code>: Invalidate student
+dashboard cache</li>
+</ul></li>
+<li><code>RiskCache</code>: Cache management for risk data
+<ul>
+<li><code>get_risk_distribution</code>: Get cached risk
+distribution</li>
+<li><code>set_risk_distribution</code>: Cache risk distribution</li>
+<li><code>invalidate_risk_distribution</code>: Invalidate all risk
+distribution caches for teacher</li>
+</ul></li>
+<li><code>DifficultyCache</code>: Cache management for difficulty data
+<ul>
+<li><code>get_hardest_lessons</code>: Get cached hardest lessons</li>
+<li><code>set_hardest_lessons</code>: Cache hardest lessons</li>
+<li><code>invalidate_difficulty_cache</code>: Invalidate difficulty
+caches</li>
+</ul></li>
+</ul>
+<h2
+id="analyticsservicesdifficulty_analyzer.py"><code>analytics/services/difficulty_analyzer.py</code></h2>
+<p><strong>Module:</strong> Difficulty Analyzer Service</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>DifficultyAnalyzer</code>: Analyzes lesson difficulty using
+updated inputs:
+<ul>
+<li><code>analyze_lesson_difficulty</code>: Calculate comprehensive
+difficulty score for a lesson</li>
+<li><code>analyze_course_difficulties</code>: Analyze difficulty for all
+lessons in a course</li>
+<li><code>get_hardest_lessons</code>: Get the hardest lessons across all
+courses or specific course</li>
+</ul></li>
+</ul>
+<h2
+id="analyticsservicesrisk_engine.py"><code>analytics/services/risk_engine.py</code></h2>
+<p><strong>Module:</strong> Risk Engine Service</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>RiskEngine</code>: Longitudinal risk scoring engine.
+<ul>
+<li><code>calculate_student_risk</code>: Calculate risk score and trend
+for a student enrollment.</li>
+<li><code>batch_calculate_risk</code>: Batch calculate risk scores for
+all active enrollments</li>
+<li><code>get_risk_trend</code>: Get risk score trend for a student over
+time</li>
+</ul></li>
+</ul>
+<h2 id="assessmentsadmin.py"><code>assessments/admin.py</code></h2>
+<p><strong>Module:</strong> Assessment Admin Configuration</p>
+<h2 id="assessmentsmodels.py"><code>assessments/models.py</code></h2>
+<p><strong>Module:</strong> Assessment and Quiz Management Models for
+TeachLink</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>Quiz</code>: Quiz/Assessment model linked to a lesson
+<ul>
+<li><code>update_statistics</code>: Update cached quiz statistics</li>
+</ul></li>
+<li><code>Question</code>: Question model for quizzes
+<ul>
+<li><code>correct_rate</code>: Percentage of times answered
+correctly</li>
+<li><code>update_difficulty</code>: Update difficulty index based on
+correct rate</li>
+</ul></li>
+<li><code>Answer</code>: Answer options for multiple choice
+questions</li>
+<li><code>QuizAttempt</code>: Student quiz attempt tracking
+<ul>
+<li><code>save</code>: Override save to validate enrollment</li>
+<li><code>calculate_score</code>: Calculate score based on
+responses</li>
+<li><code>complete</code>: Complete the quiz attempt</li>
+<li><code>update_enrollment_performance</code>: Update student’s
+enrollment average quiz score</li>
+</ul></li>
+<li><code>QuestionResponse</code>: Detailed response tracking for
+analytics</li>
+</ul>
+<h2
+id="assessmentsscriptscreate_test_quiz.py"><code>assessments/scripts/create_test_quiz.py</code></h2>
+<p><strong>Module:</strong> Create test quiz with questions and answers
+for TeachLink</p>
+<h2
+id="assessmentsscriptstest_quiz_api.py"><code>assessments/scripts/test_quiz_api.py</code></h2>
+<p><strong>Module:</strong> Test Quiz API endpoints using requests</p>
+<h2
+id="assessmentsscriptstest_quiz_edge_cases.py"><code>assessments/scripts/test_quiz_edge_cases.py</code></h2>
+<p><strong>Module:</strong> Test edge cases for quiz system</p>
+<p><strong>Functions</strong></p>
+<ul>
+<li><code>create_api_request</code>: Helper to create an authenticated
+API request</li>
+<li><code>find_student_with_attempts</code>: Find a student who has
+fewer than max_attempts completed attempts</li>
+<li><code>cleanup_active_attempts</code>: Clean up any active attempts
+for this student and quiz</li>
+<li><code>test_attempt_limit</code>: Test 1: Attempt limit
+enforcement</li>
+<li><code>test_time_limit</code>: Test 2: Time limit enforcement</li>
+<li><code>test_empty_responses</code>: Test 3: Empty responses should
+score 0%</li>
+<li><code>test_invalid_question_ids</code>: Test 4: Invalid question IDs
+should be handled gracefully</li>
+<li><code>test_duplicate_completion</code>: Test 5: Duplicate submission
+should be blocked</li>
+<li><code>test_enrollment_validation</code>: Test 6: Cannot attempt quiz
+without enrollment</li>
+<li><code>test_edge_cases</code>: Main test runner</li>
+</ul>
+<h2
+id="assessmentsscriptstest_quiz_flow.py"><code>assessments/scripts/test_quiz_flow.py</code></h2>
+<p><strong>Module:</strong> Test the complete quiz attempt flow</p>
+<h2
+id="assessmentsscriptsverify_quiz_data.py"><code>assessments/scripts/verify_quiz_data.py</code></h2>
+<p><strong>Module:</strong> Verify quiz data and statistics</p>
+<h2
+id="assessmentsserializers.py"><code>assessments/serializers.py</code></h2>
+<p><strong>Module:</strong> Assessment serializers for TeachLink</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>AnswerSerializer</code>: Answer serializer for multiple
+choice</li>
+<li><code>AnswerDetailSerializer</code>: Answer serializer for teachers
+(shows correct flag)</li>
+<li><code>QuestionSerializer</code>: Question serializer for
+teachers</li>
+<li><code>QuestionStudentSerializer</code>: Question serializer for
+students (no correct answers)</li>
+<li><code>QuizSerializer</code>: Quiz serializer for teachers</li>
+<li><code>QuizDetailSerializer</code>: Detailed quiz serializer with
+questions</li>
+<li><code>QuizStudentSerializer</code>: Quiz serializer for
+students</li>
+<li><code>QuizAttemptSerializer</code>: Quiz attempt serializer</li>
+<li><code>QuizAttemptDetailSerializer</code>: Detailed attempt
+serializer with responses
+<ul>
+<li><code>get_questions</code>: Get questions with student’s answers and
+correct answers</li>
+</ul></li>
+<li><code>QuizAttemptStartSerializer</code>: Serializer for starting a
+quiz attempt</li>
+<li><code>QuizSubmitSerializer</code>: Serializer for submitting quiz
+answers</li>
+</ul>
+<h2 id="assessmentssignals.py"><code>assessments/signals.py</code></h2>
+<p><strong>Functions</strong></p>
+<ul>
+<li><code>update_quiz_question_count</code>: Update quiz total_questions
+when questions are added/removed</li>
+<li><code>update_quiz_statistics_on_attempt</code>: Update quiz
+statistics when a new attempt is completed</li>
+</ul>
+<h2 id="assessmentsurls.py"><code>assessments/urls.py</code></h2>
+<p><strong>Module:</strong> Assessment URLs for TeachLink</p>
+<h2 id="assessmentsviews.py"><code>assessments/views.py</code></h2>
+<p><strong>Module:</strong> Assessment views for TeachLink</p>
+<p><strong>Functions</strong></p>
+<ul>
+<li><code>cls_quiz_has_attempts</code>: Return True when any student has
+started/submitted an attempt for this quiz.</li>
+</ul>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>QuizViewSet</code>: ViewSet for Quiz operations
+<ul>
+<li><code>perform_create</code>: Create quiz and link to lesson</li>
+<li><code>start</code>: Start a quiz attempt</li>
+<li><code>submit</code>: Submit quiz answers</li>
+<li><code>my_attempts</code>: Get current student’s quiz attempts</li>
+</ul></li>
+<li><code>QuestionViewSet</code>: ViewSet for Question operations
+<ul>
+<li><code>perform_create</code>: Create question and auto-set order</li>
+</ul></li>
+<li><code>AnswerViewSet</code>: ViewSet for Answer operations
+<ul>
+<li><code>perform_create</code>: Create answer and auto-set order</li>
+</ul></li>
+<li><code>QuizAttemptViewSet</code>: ViewSet for viewing quiz attempts
+<ul>
+<li><code>quiz_performance</code>: Get performance analytics for a
+quiz</li>
+</ul></li>
+</ul>
+<h2 id="coursesadmin.py"><code>courses/admin.py</code></h2>
+<p><strong>Module:</strong> Course Management Admin Configuration</p>
+<h2 id="coursesmodels.py"><code>courses/models.py</code></h2>
+<p><strong>Module:</strong> Course Management Models for TeachLink</p>
+<p><strong>Functions</strong></p>
+<ul>
+<li><code>default_course_key</code>: Generate a short enrollment key for
+students.</li>
+</ul>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>Course</code>: Main course container created by teachers
+<ul>
+<li><code>total_students</code>: Get total enrolled students</li>
+<li><code>total_modules</code>: Get total modules in course</li>
+<li><code>total_lessons</code>: Get total lessons across all
+modules</li>
+<li><code>publish</code>: Publish the course</li>
+</ul></li>
+<li><code>Module</code>: Course module/unit container
+<ul>
+<li><code>total_lessons</code>: Get total lessons in module</li>
+<li><code>completed_lessons_count</code>: Get completed lessons count
+for a student</li>
+</ul></li>
+<li><code>Lesson</code>: Individual lesson/content unit
+<ul>
+<li><code>has_quiz</code>: Check if lesson has associated quiz</li>
+<li><code>total_views</code>: Get total views count</li>
+<li><code>update_difficulty</code>: Update lesson difficulty based
+on:</li>
+</ul></li>
+<li><code>LessonCompletion</code>: Track student lesson completion</li>
+<li><code>Enrollment</code>: Student enrollment in a course
+<ul>
+<li><code>update_progress</code>: Calculate and update course progress
+percentage</li>
+<li><code>update_last_activity</code>: Update last activity
+timestamp</li>
+<li><code>mark_completed</code>: Mark enrollment as completed</li>
+<li><code>days_since_last_activity</code>: Get days since last
+activity</li>
+<li><code>is_at_risk</code>: Quick check if student is at risk</li>
+<li><code>is_inactive</code>: Check if student is inactive (&gt;7
+days)</li>
+</ul></li>
+</ul>
+<h2
+id="coursesscriptsseed_courses.py"><code>courses/scripts/seed_courses.py</code></h2>
+<p><strong>Module:</strong> Seed script for course test data</p>
+<h2
+id="coursesscriptstest_courses_api.py"><code>courses/scripts/test_courses_api.py</code></h2>
+<p><strong>Module:</strong> Test script for Course API endpoints</p>
+<h2 id="coursesserializers.py"><code>courses/serializers.py</code></h2>
+<p><strong>Module:</strong> Course Management Serializers</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>LessonSerializer</code>: Lesson serializer</li>
+<li><code>LessonDetailSerializer</code>: Detailed lesson serializer with
+completion status</li>
+<li><code>ModuleSerializer</code>: Module serializer with lessons</li>
+<li><code>ModuleDetailSerializer</code>: Detailed module serializer with
+full lesson details</li>
+<li><code>CourseSerializer</code>: Course list/overview serializer</li>
+<li><code>CourseDetailSerializer</code>: Detailed course serializer with
+related data
+<ul>
+<li><code>get_enrollment_status</code>: Get current user’s enrollment
+status</li>
+<li><code>get_student_progress</code>: Get detailed progress for current
+student</li>
+</ul></li>
+<li><code>EnrollmentSerializer</code>: Enrollment serializer</li>
+<li><code>EnrollmentDetailSerializer</code>: Detailed enrollment
+serializer for analytics</li>
+<li><code>LessonCompletionSerializer</code>: Lesson completion
+serializer</li>
+</ul>
+<h2 id="coursesurls.py"><code>courses/urls.py</code></h2>
+<p><strong>Module:</strong> Course Management URLs</p>
+<h2 id="coursesviews.py"><code>courses/views.py</code></h2>
+<p><strong>Module:</strong> Course Management Views</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>CourseViewSet</code>: ViewSet for Course operations
+<ul>
+<li><code>perform_create</code>: Set teacher as current user and email
+enrollment key.</li>
+<li><code>enroll</code>: Enroll current student in course</li>
+<li><code>publish</code>: Publish a teacher’s course so students can
+enroll.</li>
+<li><code>regenerate_enrollment_key</code>: Regenerate enrollment key
+and email it to the teacher.</li>
+<li><code>unpublish</code>: Unpublish a teacher’s course and move it
+back to draft.</li>
+<li><code>unenroll</code>: Unenroll from course</li>
+</ul></li>
+<li><code>ModuleViewSet</code>: ViewSet for Module operations
+<ul>
+<li><code>perform_create</code>: Auto-set order if not provided</li>
+</ul></li>
+<li><code>LessonViewSet</code>: ViewSet for Lesson operations
+<ul>
+<li><code>perform_create</code>: Auto-set order if not provided</li>
+<li><code>complete</code>: Mark lesson as completed</li>
+</ul></li>
+<li><code>EnrollmentViewSet</code>: ViewSet for Enrollment operations
+<ul>
+<li><code>my_enrollments</code>: Get current student’s enrollments</li>
+<li><code>update_risk</code>: Manually update risk score for
+enrollment</li>
+</ul></li>
+</ul>
+<h2
+id="dashboardcontext_processor.py"><code>dashboard/context_processor.py</code></h2>
+<p><strong>Module:</strong> Context processors for dashboard
+templates</p>
+<p><strong>Functions</strong></p>
+<ul>
+<li><code>navigation_context</code>: Add navigation menu and counts to
+template context</li>
+</ul>
+<h2
+id="dashboardmiddleware.py"><code>dashboard/middleware.py</code></h2>
+<p><strong>Module:</strong> Middleware to store JWT token in session for
+template access</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>TokenMiddleware</code>: Store JWT token from Authorization
+header in session
+<ul>
+<li><code>process_request</code>: Extract token from Authorization
+header and store in session</li>
+<li><code>process_response</code>: Clean up any sensitive data if
+needed</li>
+</ul></li>
+</ul>
+<h2
+id="dashboardscriptstest_dashboard.py"><code>dashboard/scripts/test_dashboard.py</code></h2>
+<p><strong>Module:</strong> Test dashboard functionality</p>
+<h2 id="dashboardurls_html.py"><code>dashboard/urls_html.py</code></h2>
+<p><strong>Module:</strong> HTML dashboard URLs for TeachLink.</p>
+<h2 id="dashboardviews.py"><code>dashboard/views.py</code></h2>
+<p><strong>Module:</strong> Dashboard Views for TeachLink</p>
+<p><strong>Functions</strong></p>
+<ul>
+<li><code>difficulty_display_label</code>: Normalize stored difficulty
+codes to 3-band display labels.</li>
+<li><code>custom_login</code>: Custom login view that redirects to
+appropriate dashboard</li>
+<li><code>custom_register</code>: Custom registration view with
+role-based redirects.</li>
+<li><code>custom_logout</code>: Session logout for dashboard web
+views</li>
+<li><code>profile_view</code>: Unified profile page for
+teacher/student/admin users</li>
+<li><code>courses_overview</code>: Role-aware courses and learning
+materials page</li>
+<li><code>open_lesson_material</code>: Track lesson material usage and
+redirect to the material link/file.</li>
+<li><code>teacher_dashboard</code>: Main teacher dashboard view</li>
+<li><code>teacher_course_analytics</code>: Course-specific analytics
+page for teachers.</li>
+<li><code>teacher_quiz_builder</code>: Teacher page to configure
+quiz/CAT settings and questions.</li>
+<li><code>student_dashboard</code>: Main student dashboard view</li>
+<li><code>student_course_quizzes</code>: Student list of quizzes/CATs
+for a specific enrolled course.</li>
+<li><code>student_quiz_attempts</code>: Student attempt summary page for
+a specific quiz/CAT.</li>
+<li><code>student_quiz_review</code>: Student question-by-question quiz
+review page.</li>
+<li><code>risk_detail</code>: Detailed student view for a teacher (risk
++ performance)</li>
+<li><code>alerts_center</code>: Alert management center for
+teachers</li>
+<li><code>export_students_csv</code>: Export student data to CSV</li>
+<li><code>teacher_students</code>: Teacher view listing all students in
+the teacher’s courses</li>
+<li><code>student_enroll_by_key</code>: Allow a student to enroll in a
+published course using enrollment key.</li>
+<li><code>teacher_payments</code>: Teacher view for payment status of
+enrolled students.</li>
+<li><code>admin_dashboard</code>: System-wide dashboard for staff/admin
+users</li>
+</ul>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>TeacherDashboardAPI</code>: API endpoints for teacher
+dashboard data
+<ul>
+<li><code>get</code>: Get all dashboard data in one request</li>
+</ul></li>
+<li><code>StudentDashboardAPI</code>: API endpoints for student
+dashboard data
+<ul>
+<li><code>get</code>: Get student’s dashboard data</li>
+<li><code>post</code>: Handle student actions like reporting
+difficulty</li>
+</ul></li>
+<li><code>StudentNotificationAPI</code>: Student notification actions
+such as marking as read.</li>
+<li><code>RiskDataAPI</code>: API for risk-related data
+visualizations</li>
+<li><code>StudentRiskDetailAPI</code>: Detailed risk data for a specific
+student
+<ul>
+<li><code>get</code>: Get detailed risk history for a student</li>
+</ul></li>
+<li><code>AlertManagementAPI</code>: API for managing alerts
+<ul>
+<li><code>get</code>: Get alerts with filtering</li>
+<li><code>post</code>: Update alert status</li>
+</ul></li>
+<li><code>DifficultyAPI</code>: API for difficulty analytics
+<ul>
+<li><code>get</code>: Get difficulty data for charts</li>
+</ul></li>
+<li><code>TeacherDashboardCachedAPI</code>: Teacher dashboard API with
+Redis caching
+<ul>
+<li><code>post</code>: Invalidate cache</li>
+</ul></li>
+<li><code>DifficultyCachedAPI</code>: Difficulty data API with caching
+<ul>
+<li><code>post</code>: Invalidate difficulty cache</li>
+</ul></li>
+</ul>
+<h2
+id="dashboardviews_cached.py"><code>dashboard/views_cached.py</code></h2>
+<p><strong>Module:</strong> Dashboard Views with Redis Caching</p>
+<p><strong>Functions</strong></p>
+<ul>
+<li><code>difficulty_display_label</code>: Normalize stored difficulty
+codes to 3-band display labels.</li>
+</ul>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>TeacherDashboardCachedAPI</code>: Teacher dashboard API with
+Redis caching
+<ul>
+<li><code>post</code>: Invalidate cache</li>
+</ul></li>
+<li><code>RiskDataCachedAPI</code>: Risk data API with caching
+<ul>
+<li><code>post</code>: Invalidate risk cache</li>
+</ul></li>
+<li><code>DifficultyCachedAPI</code>: Difficulty data API with caching
+<ul>
+<li><code>post</code>: Invalidate difficulty cache</li>
+</ul></li>
+</ul>
+<h2 id="usersmodels.py"><code>users/models.py</code></h2>
+<p><strong>Module:</strong> Custom User Model for TeachLink</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>User</code>: Custom user model supporting Teacher and Student
+roles
+<ul>
+<li><code>update_last_activity</code>: Update user’s last activity
+timestamp</li>
+</ul></li>
+<li><code>UserSession</code>: Track user sessions for engagement
+monitoring
+<ul>
+<li><code>end_session</code>: Mark session as ended</li>
+</ul></li>
+</ul>
+<h2 id="userspermissions.py"><code>users/permissions.py</code></h2>
+<p><strong>Module:</strong> Custom permissions for TeachLink.</p>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>IsTeacher</code>: Allow access only to teachers.</li>
+<li><code>IsStudent</code>: Allow access only to students.</li>
+<li><code>IsTeacherOrReadOnly</code>: Allow teachers to
+create/update/delete.</li>
+</ul>
+<h2 id="usersserializers.py"><code>users/serializers.py</code></h2>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>UserSerializer</code>: Public user profile serializer</li>
+<li><code>UserDetailSerializer</code>: Detailed user serializer for
+profile pages</li>
+<li><code>RegisterSerializer</code>: User registration serializer
+<ul>
+<li><code>validate</code>: Validate that passwords match</li>
+</ul></li>
+<li><code>LoginSerializer</code>: User login serializer
+<ul>
+<li><code>validate</code>: Validate login credentials</li>
+</ul></li>
+<li><code>UserSessionSerializer</code>: User session serializer</li>
+</ul>
+<h2 id="usersviews.py"><code>users/views.py</code></h2>
+<p><strong>Classes</strong></p>
+<ul>
+<li><code>UserViewSet</code>: ViewSet for viewing user profiles
+(read-only).
+<ul>
+<li><code>get_serializer_class</code>: Use detail serializer for
+retrieve action</li>
+<li><code>get_queryset</code>: Filter queryset based on user role</li>
+</ul></li>
+<li><code>RegisterView</code>: API endpoint for user registration.</li>
+<li><code>LoginView</code>: API endpoint for user login.</li>
+<li><code>LogoutView</code>: API endpoint for user logout.</li>
+<li><code>UserProfileView</code>: API endpoint for getting/updating the
+current user’s profile.
+<ul>
+<li><code>get_object</code>: Return the current authenticated user</li>
+<li><code>perform_update</code>: Update user profile</li>
+</ul></li>
+<li><code>UserSessionsView</code>: API endpoint for viewing user’s
+active sessions.
+<ul>
+<li><code>get_queryset</code>: Return user’s active sessions</li>
+</ul></li>
+<li><code>ChangePasswordView</code>: API endpoint for changing
+password.</li>
+</ul>

@@ -1,0 +1,174 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Quiz Attempts{% endblock %}
+
+{% block extra_css %}
+<style>
+    .attempt-wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+    .attempt-summary {
+        border-radius: 14px;
+        border: 1px solid #dfe4ef;
+        background: #fff;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        overflow: hidden;
+    }
+    .attempt-summary th {
+        width: 220px;
+        background: #f7f9fc;
+        font-weight: 700;
+    }
+    .final-grade {
+        color: #13356d;
+        font-size: clamp(1.6rem, 2.2vw, 2.7rem);
+        font-weight: 700;
+        line-height: 1.2;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="attempt-wrap">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <p class="text-uppercase small fw-semibold text-primary mb-1">Assessment Attempts</p>
+                <h2 class="fw-bold mb-1">{{ quiz.title }}</h2>
+                <p class="text-muted mb-0">{{ course.title }} | {{ quiz.lesson.title }}</p>
+            </div>
+            <a href="{% url 'student_course_quizzes' course.id %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Course Content
+            </a>
+        </div>
+
+        <div class="mb-4">
+            <p class="mb-1 fs-5">Attempts allowed: <strong>{{ attempts_allowed }}</strong></p>
+            <p class="mb-0 fs-5">
+                Time limit:
+                {% if quiz.time_limit_minutes > 0 %}
+                    <strong>{{ quiz.time_limit_minutes }} mins</strong>
+                {% else %}
+                    <strong>No limit</strong>
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="mb-4">
+            <div class="final-grade">Your final grade for this quiz is {{ final_grade }} ({{ final_percentage|floatformat:2 }}%).</div>
+            {% if attempts_left <= 0 %}
+                <div class="mt-2 text-muted fs-5">No more attempts are allowed.</div>
+            {% else %}
+                <div class="mt-2 text-muted fs-5">{{ attempts_left }} attempt(s) remaining.</div>
+            {% endif %}
+            <div class="mt-3 d-flex flex-wrap gap-2">
+                {% if can_take_quiz and not show_take_form %}
+                <a href="{% url 'student_quiz_attempts' quiz.id %}?take=1" class="btn btn-primary">
+                    <i class="fas fa-play me-1"></i>Take Quiz
+                </a>
+                {% endif %}
+                {% if show_take_form %}
+                <a href="{% url 'student_quiz_attempts' quiz.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times me-1"></i>Cancel
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if show_take_form %}
+        <section class="attempt-summary mb-4">
+            <header class="px-4 py-3 border-bottom bg-white">
+                <h4 class="mb-0 fw-bold">Take Quiz</h4>
+            </header>
+            <div class="p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="submit_quiz">
+                    {% for row in question_rows %}
+                    <div class="mb-4">
+                        <div class="fw-semibold mb-2">{{ forloop.counter }}. {{ row.question.text }}</div>
+                        {% if row.answers %}
+                            {% for answer in row.answers %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="q_{{ row.question.id }}" id="q_{{ row.question.id }}_{{ answer.id }}" value="{{ answer.id }}">
+                                <label class="form-check-label" for="q_{{ row.question.id }}_{{ answer.id }}">
+                                    {{ answer.text }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        {% elif row.question.question_type == 'TF' %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="q_{{ row.question.id }}" id="q_{{ row.question.id }}_true" value="true">
+                                <label class="form-check-label" for="q_{{ row.question.id }}_true">True</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="q_{{ row.question.id }}" id="q_{{ row.question.id }}_false" value="false">
+                                <label class="form-check-label" for="q_{{ row.question.id }}_false">False</label>
+                            </div>
+                        {% else %}
+                            <div class="text-muted small">No answer options configured for this question.</div>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="text-muted">No questions available.</div>
+                    {% endfor %}
+
+                    {% if question_rows %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-paper-plane me-1"></i>Submit Quiz
+                    </button>
+                    {% endif %}
+                </form>
+            </div>
+        </section>
+        {% endif %}
+
+        <h3 class="fw-bold mb-3">Your attempts</h3>
+        {% if attempt_rows %}
+            {% for row in attempt_rows %}
+            <section class="attempt-summary mb-4">
+                <header class="px-4 py-3 border-bottom bg-white">
+                    <h4 class="mb-0 fw-bold">Attempt {{ row.attempt.attempt_number }}</h4>
+                </header>
+                <table class="table table-bordered mb-0 align-middle">
+                    <tbody>
+                        <tr>
+                            <th>Status</th>
+                            <td>{{ row.attempt.get_status_display }}</td>
+                        </tr>
+                        <tr>
+                            <th>Started</th>
+                            <td>{{ row.attempt.started_at|date:"l, d F Y, g:i A" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Completed</th>
+                            <td>
+                                {% if row.submitted_label %}
+                                    {{ row.submitted_label|date:"l, d F Y, g:i A" }}
+                                {% else %}
+                                    Not submitted
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Duration</th>
+                            <td>{{ row.duration_label }}</td>
+                        </tr>
+                        <tr>
+                            <th>Grade</th>
+                            <td>{{ row.score_label }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="p-3">
+                    <a href="{% url 'student_quiz_review' row.attempt.id %}" class="btn btn-warning">Review</a>
+                </div>
+            </section>
+            {% endfor %}
+        {% else %}
+            {% include "components/empty_state.html" with icon="fa-pen" title="No attempts yet" message="You haven't taken this assessment yet. Click the button above to take it now." %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

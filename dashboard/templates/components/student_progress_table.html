@@ -1,0 +1,606 @@
+{% comment %}
+Unified Student Progress Table
+Displays all students with progress, risk, engagement, and quiz scores
+Supports filtering by risk level, progress range, and last activity
+{% endcomment %}
+
+<div class="student-progress-container">
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label for="filter-risk">Risk Level</label>
+            <select id="filter-risk" class="form-select filter-select">
+                <option value="">All Students</option>
+                <option value="HIGH">High Risk</option>
+                <option value="MEDIUM">Medium Risk</option>
+                <option value="LOW">Low Risk</option>
+            </select>
+        </div>
+        
+        <div class="filter-group">
+            <label for="filter-progress">Progress</label>
+            <div class="progress-filter">
+                <input type="range" id="filter-progress-min" min="0" max="100" value="0" class="filter-slider">
+                <span id="progress-display">0%</span>
+                <span>-</span>
+                <span id="progress-display-max">100%</span>
+            </div>
+        </div>
+        
+        <div class="filter-group">
+            <label for="filter-activity">Activity</label>
+            <select id="filter-activity" class="form-select filter-select">
+                <option value="">Any Time</option>
+                <option value="7">Last 7 Days</option>
+                <option value="14">Last 14 Days</option>
+                <option value="30">Last 30 Days</option>
+                <option value="999">More than 30 Days</option>
+            </select>
+        </div>
+        
+        <button id="btn-reset-filters" class="btn btn-secondary btn-sm">Reset Filters</button>
+    </div>
+    
+    <!-- Tab Navigation -->
+    <div class="nav nav-tabs progress-tabs" role="tablist">
+        <button class="nav-link active" id="tab-all" data-bs-toggle="tab" data-bs-target="#panel-all" role="tab">
+            All Students
+            <span class="badge bg-primary">{{ students|length }}</span>
+        </button>
+        <button class="nav-link" id="tab-at-risk" data-bs-toggle="tab" data-bs-target="#panel-at-risk" role="tab">
+            At Risk
+            <span class="badge bg-danger">{{ at_risk_count }}</span>
+        </button>
+        <button class="nav-link" id="tab-high-performers" data-bs-toggle="tab" data-bs-target="#panel-high-performers" role="tab">
+            High Performers
+            <span class="badge bg-success">{{ high_performers_count }}</span>
+        </button>
+        <button class="nav-link" id="tab-behind" data-bs-toggle="tab" data-bs-target="#panel-behind" role="tab">
+            Behind
+            <span class="badge bg-warning">{{ behind_count }}</span>
+        </button>
+    </div>
+    
+    <!-- Table Container -->
+    <div class="tab-content">
+        <!-- All Students Tab -->
+        <div class="tab-pane fade show active" id="panel-all" role="tabpanel">
+            {% if students %}
+                <div class="table-responsive">
+                    <table class="table table-hover student-progress-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="sortable" data-sort="name">
+                                    <i class="fas fa-user"></i> Student Name
+                                </th>
+                                <th class="sortable" data-sort="progress">
+                                    <i class="fas fa-chart-pie"></i> Progress
+                                    <i class="fas fa-info-circle tooltip-trigger" data-tooltip="Percentage of lessons completed"></i>
+                                </th>
+                                <th class="sortable" data-sort="risk">
+                                    <i class="fas fa-exclamation"></i> Risk Level
+                                    <i class="fas fa-info-circle tooltip-trigger" data-tooltip="Based on progress, quiz score, and inactivity"></i>
+                                </th>
+                                <th class="sortable" data-sort="engagement">
+                                    <i class="fas fa-fire"></i> Engagement
+                                    <i class="fas fa-info-circle tooltip-trigger" data-tooltip="Activity level and time spent"></i>
+                                </th>
+                                <th class="sortable" data-sort="quiz">
+                                    <i class="fas fa-graduation-cap"></i> Quiz Avg
+                                    <i class="fas fa-info-circle tooltip-trigger" data-tooltip="Average quiz score"></i>
+                                </th>
+                                <th class="sortable" data-sort="activity">
+                                    <i class="fas fa-clock"></i> Last Activity
+                                </th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for enrollment in students %}
+                                <tr class="student-row" data-risk="{{ enrollment.risk_level }}" data-progress="{{ enrollment.progress_percentage }}" data-activity="{{ enrollment.days_since_last_activity }}">
+                                    <td>
+                                        <div class="student-name-cell">
+                                            <div class="student-avatar">{{ enrollment.student.first_name|first }}{{ enrollment.student.last_name|first }}</div>
+                                            <span>{{ enrollment.student.display_name }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress-cell">
+                                            <div class="progress" style="height: 24px;">
+                                                <div class="progress-bar" role="progressbar" style="width: {{ enrollment.progress_percentage }}%;" aria-valuenow="{{ enrollment.progress_percentage }}" aria-valuemin="0" aria-valuemax="100">
+                                                    {{ enrollment.progress_percentage|floatformat:0 }}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge risk-badge risk-{{ enrollment.risk_level|lower }}">
+                                            {{ enrollment.risk_level }}
+                                            <span class="risk-score">({{ enrollment.risk_score|floatformat:2 }})</span>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="engagement-cell">
+                                            <div class="engagement-bar">
+                                                <div class="engagement-fill" style="width: {{ enrollment.engagement_score|multiply:100 }}%;"></div>
+                                            </div>
+                                            <span class="engagement-text">{{ enrollment.engagement_score|multiply:100|floatformat:0 }}%</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ enrollment.average_quiz_score|floatformat:0 }}%</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted text-nowrap">
+                                            {% if enrollment.days_since_last_activity == 0 %}
+                                                Today
+                                            {% elif enrollment.days_since_last_activity == 1 %}
+                                                Yesterday
+                                            {% elif enrollment.days_since_last_activity <= 7 %}
+                                                {{ enrollment.days_since_last_activity }} days ago
+                                            {% else %}
+                                                {{ enrollment.last_activity|date:"M d" }}
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <a href="{% url 'dashboard_student_detail' enrollment.student.id %}" class="btn btn-sm btn-outline-primary" title="View details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#modal-intervention-{{ enrollment.id }}" title="Log intervention">
+                                                <i class="fas fa-hand-paper"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-what-if-{{ enrollment.id }}" title="What-if simulator">
+                                                <i class="fas fa-crystal-ball"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-users-slash"></i>
+                    <p>No students enrolled yet</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- At Risk Tab -->
+        <div class="tab-pane fade" id="panel-at-risk" role="tabpanel">
+            {% if at_risk_students %}
+                <div class="table-responsive">
+                    <table class="table table-hover student-progress-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Student Name</th>
+                                <th>Risk Level</th>
+                                <th>Progress</th>
+                                <th>Quiz Avg</th>
+                                <th>Days Inactive</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for enrollment in at_risk_students %}
+                                <tr>
+                                    <td>{{ enrollment.student.display_name }}</td>
+                                    <td><span class="badge risk-{{ enrollment.risk_level|lower }}">{{ enrollment.risk_level }}</span></td>
+                                    <td>{{ enrollment.progress_percentage|floatformat:0 }}%</td>
+                                    <td>{{ enrollment.average_quiz_score|floatformat:0 }}%</td>
+                                    <td>{{ enrollment.days_since_last_activity }}</td>
+                                    <td>
+                                        <a href="{% url 'dashboard_student_detail' enrollment.student.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-check-circle text-success"></i>
+                    <p>No students at risk - Great job!</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- High Performers Tab -->
+        <div class="tab-pane fade" id="panel-high-performers" role="tabpanel">
+            {% if high_performers %}
+                <div class="table-responsive">
+                    <table class="table table-hover student-progress-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Student Name</th>
+                                <th>Progress</th>
+                                <th>Quiz Avg</th>
+                                <th>Engagement</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for enrollment in high_performers %}
+                                <tr>
+                                    <td>{{ enrollment.student.display_name }}</td>
+                                    <td>{{ enrollment.progress_percentage|floatformat:0 }}%</td>
+                                    <td><span class="badge bg-success">{{ enrollment.average_quiz_score|floatformat:0 }}%</span></td>
+                                    <td>{{ enrollment.engagement_score|multiply:100|floatformat:0 }}%</td>
+                                    <td>
+                                        <a href="{% url 'dashboard_student_detail' enrollment.student.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <p>No high performers yet</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Behind Tab -->
+        <div class="tab-pane fade" id="panel-behind" role="tabpanel">
+            {% if behind_students %}
+                <div class="table-responsive">
+                    <table class="table table-hover student-progress-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Student Name</th>
+                                <th>Progress</th>
+                                <th>Quiz Avg</th>
+                                <th>Last Activity</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for enrollment in behind_students %}
+                                <tr>
+                                    <td>{{ enrollment.student.display_name }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-warning" style="width: {{ enrollment.progress_percentage }}%;"></div>
+                                        </div>
+                                        {{ enrollment.progress_percentage|floatformat:0 }}%
+                                    </td>
+                                    <td>{{ enrollment.average_quiz_score|floatformat:0 }}%</td>
+                                    <td>{{ enrollment.days_since_last_activity }} days ago</td>
+                                    <td>
+                                        <a href="{% url 'dashboard_student_detail' enrollment.student.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <p>All students are on track</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.student-progress-container {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    margin-top: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.filter-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.filter-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.filter-select {
+    border-radius: 0.375rem;
+    border: 1px solid #d1d5db;
+    padding: 0.5rem 0.75rem;
+    min-width: 120px;
+}
+
+.progress-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-slider {
+    width: 150px;
+}
+
+.progress-tabs {
+    border-bottom: 2px solid #e5e7eb;
+    margin-bottom: 1.5rem;
+}
+
+.progress-tabs .nav-link {
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #6b7280;
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    margin-bottom: -2px;
+}
+
+.progress-tabs .nav-link:hover {
+    border-bottom-color: #d1d5db;
+    color: #374151;
+}
+
+.progress-tabs .nav-link.active {
+    border-bottom-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.nav-link .badge {
+    margin-left: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.student-progress-table {
+    margin-bottom: 0;
+}
+
+.student-progress-table thead th {
+    border-bottom: 2px solid #e5e7eb;
+    background: #f9fafb;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #374151;
+    padding: 0.75rem;
+}
+
+.student-progress-table tbody tr:hover {
+    background: #f3f4f6;
+}
+
+.student-progress-table tbody td {
+    padding: 0.75rem;
+    vertical-align: middle;
+}
+
+.student-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.student-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.progress-cell {
+    min-width: 200px;
+}
+
+.progress-cell .progress {
+    border-radius: 0.25rem;
+    background: #e5e7eb;
+    overflow: hidden;
+}
+
+.progress-cell .progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+.risk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.risk-badge.risk-high {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.risk-badge.risk-medium {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.risk-badge.risk-low {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.risk-score {
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
+.engagement-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.engagement-bar {
+    width: 80px;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.engagement-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+}
+
+.engagement-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    min-width: 35px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.action-buttons .btn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    color: #d1d5db;
+    margin-bottom: 1rem;
+}
+
+.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortable:hover {
+    background: #eff6ff;
+}
+
+.tooltip-trigger {
+    margin-left: 0.35rem;
+    cursor: help;
+    font-size: 0.75rem;
+    color: #3b82f6;
+    opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+    .filter-bar {
+        flex-direction: column;
+    }
+
+    .filter-group {
+        width: 100%;
+    }
+
+    .filter-select {
+        min-width: 100%;
+    }
+
+    .progress-tabs {
+        flex-wrap: wrap;
+    }
+
+    .table-responsive {
+        font-size: 0.85rem;
+    }
+
+    .student-progress-table thead th {
+        padding: 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    .student-progress-table tbody td {
+        padding: 0.5rem;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Filter functionality
+    const filterRisk = document.getElementById('filter-risk');
+    const filterProgress = document.getElementById('filter-progress-min');
+    const filterActivity = document.getElementById('filter-activity');
+    const btnReset = document.getElementById('btn-reset-filters');
+    
+    function applyFilters() {
+        const rows = document.querySelectorAll('.student-row');
+        const riskFilter = filterRisk.value;
+        const progressMin = parseInt(filterProgress.value);
+        const activityFilter = parseInt(filterActivity.value || 999);
+        
+        rows.forEach(row => {
+            let show = true;
+            
+            if (riskFilter && row.dataset.risk !== riskFilter) show = false;
+            if (parseInt(row.dataset.progress) < progressMin) show = false;
+            if (row.dataset.activity > activityFilter) show = false;
+            
+            row.style.display = show ? '' : 'none';
+        });
+    }
+    
+    filterRisk.addEventListener('change', applyFilters);
+    filterProgress.addEventListener('input', applyFilters);
+    filterActivity.addEventListener('change', applyFilters);
+    
+    // Reset filters
+    btnReset.addEventListener('click', function() {
+        filterRisk.value = '';
+        filterProgress.value = '0';
+        filterActivity.value = '';
+        document.querySelectorAll('.student-row').forEach(row => {
+            row.style.display = '';
+        });
+    });
+});
+</script>

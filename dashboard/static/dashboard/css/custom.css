@@ -1,0 +1,307 @@
+/* TeachLink dashboard styles */
+
+:root {
+    --app-font-family: "Manrope", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    /* Risk color tokens */
+    --risk-critical: #dc2626;
+    --risk-high: #ef4444;
+    --risk-medium: #f59e0b;
+    --risk-low: #10b981;
+    /* Spacing tokens */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+}
+
+html,
+body,
+.dashboard-shell,
+.dashboard-sidebar,
+.dashboard-main {
+    font-family: var(--app-font-family) !important;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6,
+p, span, small, label, th, td,
+input, textarea, select, button,
+.form-control, .form-select, .btn,
+.nav-link, .dropdown-item, .table {
+    font-family: inherit;
+}
+
+.dashboard-shell {
+    min-height: 100vh;
+}
+
+.dashboard-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 18rem;
+    height: 100vh;
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1040;
+    transform: translateX(calc(-100% + 3rem));
+    transition: transform 0.2s ease;
+}
+
+.dashboard-sidebar nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.sidebar-footer {
+    flex-shrink: 0;
+    background: #ffffff;
+}
+
+.dashboard-sidebar.expanded {
+    transform: translateX(0);
+}
+
+.dashboard-main {
+    min-height: 100vh;
+    transition: margin-left 0.2s ease, width 0.2s ease;
+    padding: var(--spacing-md);
+}
+
+.sidebar-toggle-handle {
+    position: absolute;
+    top: 1rem;
+    right: 0.25rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1060;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sidebar-toggle-handle:hover {
+    background-color: #f1f5f9;
+    box-shadow: 0 6px 12px rgba(15, 23, 42, 0.2);
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.5rem;
+    color: #334155;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-link:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.sidebar-link.active {
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-weight: 600;
+}
+
+.sidebar-section-title {
+    margin: 1rem 0.5rem 0.5rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    font-weight: 700;
+}
+
+.student-sidebar-note {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.6rem;
+    padding: 0.6rem 0.7rem;
+    margin: 0.5rem 0.5rem 0;
+}
+
+.sidebar-quick-card {
+    margin: 0.5rem 0.5rem 0;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
+    background: #f8fafc;
+}
+
+.sidebar-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.sidebar-stat-item {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.7rem;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.sidebar-stat-label {
+    font-size: 0.7rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-weight: 700;
+}
+
+.sidebar-stat-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 0.25rem;
+}
+
+/* Button standardization */
+.btn {
+    font-weight: 500;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    transition: all 0.15s ease;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #1e40af;
+    border-color: #1e40af;
+}
+
+.btn-outline-primary {
+    color: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.btn-outline-primary:hover:not(:disabled) {
+    background-color: #1d4ed8;
+    color: white;
+}
+
+.btn-sm {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+/* Card standardization */
+.card {
+    border: 0;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.5rem 1.25rem rgba(15, 23, 42, 0.08);
+    margin-bottom: var(--spacing-md);
+}
+
+.card-header {
+    background-color: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1rem 1.25rem;
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+/* Risk level color standardization */
+.badge.text-bg-critical {
+    background-color: var(--risk-critical) !important;
+}
+
+.badge.text-bg-danger {
+    background-color: var(--risk-high) !important;
+}
+
+.badge.text-bg-warning {
+    background-color: var(--risk-medium) !important;
+}
+
+.badge.text-bg-success {
+    background-color: var(--risk-low) !important;
+}
+
+/* Alert banner styling */
+.alert {
+    border-radius: 0.75rem;
+}
+
+.alert-warning {
+    background-color: #fffbeb;
+    border-color: #fde047;
+    color: #92400e;
+}
+
+.alert-warning .btn-outline-warning {
+    color: #f59e0b;
+    border-color: #f59e0b;
+}
+
+/* Table consistency */
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    font-weight: 600;
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+    padding: 0.75rem 1rem;
+}
+
+.table td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+}
+
+.table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+@media (min-width: 992px) {
+    .dashboard-shell {
+        display: flex;
+    }
+
+    .dashboard-sidebar {
+        transform: translateX(0);
+    }
+
+    .dashboard-main {
+        margin-left: 18rem;
+        width: calc(100% - 18rem);
+    }
+
+    .dashboard-sidebar.collapsed {
+        transform: translateX(calc(-100% + 3rem));
+    }
+
+    .dashboard-sidebar.collapsed + .dashboard-main {
+        margin-left: 0;
+        width: 100%;
+    }
+}

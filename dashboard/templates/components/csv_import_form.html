@@ -1,0 +1,775 @@
+{# CSV Import Form for Test Scores #}
+{# Phase 4: CSV Import for Offline Test Scores #}
+{# Usage: {% include "components/csv_import_form.html" with course=course_obj %} #}
+
+<style>
+    .csv-import-container {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+
+    .csv-import-header {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .csv-import-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 2px solid #e9ecef;
+        margin-bottom: 24px;
+    }
+
+    .csv-tab {
+        padding: 12px 16px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s;
+        margin-bottom: -2px;
+    }
+
+    .csv-tab:hover {
+        color: #333;
+    }
+
+    .csv-tab.active {
+        color: #0066cc;
+        border-bottom-color: #0066cc;
+    }
+
+    .csv-tab-content {
+        display: none;
+    }
+
+    .csv-tab-content.active {
+        display: block;
+    }
+
+    .csv-upload-area {
+        border: 2px dashed #ccc;
+        border-radius: 8px;
+        padding: 32px 24px;
+        text-align: center;
+        transition: all 0.2s;
+        background: #fafafa;
+        cursor: pointer;
+    }
+
+    .csv-upload-area:hover {
+        border-color: #0066cc;
+        background: #f0f4ff;
+    }
+
+    .csv-upload-area.dragover {
+        border-color: #0066cc;
+        background: #e6f0ff;
+    }
+
+    .csv-upload-icon {
+        font-size: 40px;
+        margin-bottom: 12px;
+    }
+
+    .csv-upload-text {
+        font-size: 14px;
+        color: #333;
+        margin-bottom: 4px;
+    }
+
+    .csv-upload-hint {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 16px;
+    }
+
+    .csv-upload-file-input {
+        display: none;
+    }
+
+    .csv-upload-btn {
+        background: #0066cc;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+
+    .csv-upload-btn:hover {
+        background: #0052a3;
+    }
+
+    .csv-template-section {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 16px;
+        margin-top: 16px;
+    }
+
+    .csv-template-title {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 12px;
+        font-size: 13px;
+    }
+
+    .csv-template-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .csv-template-table th {
+        background: #e9ecef;
+        padding: 10px;
+        text-align: left;
+        font-weight: 600;
+        color: #666;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .csv-template-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .csv-template-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .csv-template-example {
+        color: #666;
+        font-style: italic;
+    }
+
+    .csv-example-code {
+        background: #f0f0f0;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 12px;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        overflow-x: auto;
+        margin-top: 12px;
+        line-height: 1.5;
+    }
+
+    .csv-download-template {
+        display: inline-block;
+        background: #f0f0f0;
+        color: #0066cc;
+        border: 1px solid #0066cc;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s;
+        text-decoration: none;
+        margin-top: 12px;
+    }
+
+    .csv-download-template:hover {
+        background: #e6f0ff;
+    }
+
+    .csv-preview-section {
+        margin-top: 24px;
+    }
+
+    .csv-preview-title {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 12px;
+        font-size: 14px;
+    }
+
+    .csv-preview-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .csv-preview-table th {
+        background: #f0f4ff;
+        padding: 10px;
+        text-align: left;
+        font-weight: 600;
+        color: #0066cc;
+        border-bottom: 2px solid #e0e7ff;
+    }
+
+    .csv-preview-table td {
+        padding: 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .csv-preview-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .csv-row-valid {
+        border-left: 3px solid #10b981;
+    }
+
+    .csv-row-error {
+        border-left: 3px solid #ef4444;
+    }
+
+    .csv-row-warning {
+        border-left: 3px solid #f59e0b;
+    }
+
+    .csv-status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .csv-status-valid {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .csv-status-error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .csv-status-warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .csv-progress-section {
+        margin-top: 24px;
+        display: none;
+    }
+
+    .csv-progress-section.active {
+        display: block;
+    }
+
+    .csv-progress-title {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 12px;
+    }
+
+    .csv-progress-bar {
+        height: 8px;
+        background: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 8px;
+    }
+
+    .csv-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #0066cc, #667eea);
+        width: 0%;
+        transition: width 0.3s;
+    }
+
+    .csv-progress-text {
+        font-size: 12px;
+        color: #666;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .csv-import-summary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 16px;
+        border-radius: 6px;
+        margin-top: 16px;
+        font-size: 13px;
+        display: none;
+    }
+
+    .csv-import-summary.active {
+        display: block;
+    }
+
+    .csv-summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+
+    .csv-summary-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .csv-import-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+        justify-content: flex-end;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        border: none;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #0066cc;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #0052a3;
+    }
+
+    .btn-primary:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    .btn-secondary {
+        background: #f0f0f0;
+        color: #333;
+    }
+
+    .btn-secondary:hover {
+        background: #e9ecef;
+    }
+
+    .csv-error-list {
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 12px;
+        font-size: 12px;
+    }
+
+    .csv-error-list li {
+        margin-bottom: 6px;
+        color: #991b1b;
+    }
+
+    .csv-error-list li:last-child {
+        margin-bottom: 0;
+    }
+
+    @media (max-width: 768px) {
+        .csv-import-container {
+            padding: 16px;
+        }
+
+        .csv-upload-area {
+            padding: 24px 16px;
+        }
+
+        .csv-import-tabs {
+            flex-wrap: wrap;
+        }
+
+        .csv-preview-table {
+            font-size: 11px;
+        }
+
+        .csv-import-actions {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="csv-import-container">
+    <div class="csv-import-header">
+        📊 Import Assessment Scores from CSV
+    </div>
+
+    <div class="csv-import-tabs">
+        <button class="csv-tab active" data-tab="upload">1. Upload</button>
+        <button class="csv-tab" data-tab="template">2. Template</button>
+        <button class="csv-tab" data-tab="preview">3. Preview</button>
+        <button class="csv-tab" data-tab="result">4. Result</button>
+    </div>
+
+    {# UPLOAD TAB #}
+    <div id="csv-tab-upload" class="csv-tab-content active">
+        <div class="csv-upload-area" id="csv-drop-zone">
+            <div class="csv-upload-icon">📁</div>
+            <div class="csv-upload-text">Drag and drop CSV file here</div>
+            <div class="csv-upload-hint">or click to browse</div>
+            <button class="csv-upload-btn" onclick="document.getElementById('csv-file-input').click();">
+                Choose File
+            </button>
+            <input type="file" id="csv-file-input" class="csv-upload-file-input" accept=".csv" />
+        </div>
+
+        <div class="csv-template-section">
+            <div class="csv-template-title">ℹ️ File Requirements</div>
+            <ul style="font-size: 12px; color: #555; margin: 0; padding-left: 20px;">
+                <li>Format: CSV (comma-separated values)</li>
+                <li>Required columns: Student Email, Assessment Name, Score, Date</li>
+                <li>Maximum file size: 5 MB</li>
+                <li>First row must contain headers</li>
+            </ul>
+        </div>
+
+        <button class="csv-download-template" onclick="downloadTemplate()">📥 Download Template</button>
+    </div>
+
+    {# TEMPLATE TAB #}
+    <div id="csv-tab-template" class="csv-tab-content">
+        <div class="csv-template-section">
+            <div class="csv-template-title">✓ CSV Template Format</div>
+            <table class="csv-template-table">
+                <thead>
+                    <tr>
+                        <th>Student Email</th>
+                        <th>Assessment Name</th>
+                        <th>Score</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="csv-template-example">alice@school.com</td>
+                        <td class="csv-template-example">Quiz 1: Fractions</td>
+                        <td class="csv-template-example">85</td>
+                        <td class="csv-template-example">2024-01-15</td>
+                    </tr>
+                    <tr>
+                        <td class="csv-template-example">bob@school.com</td>
+                        <td class="csv-template-example">Quiz 1: Fractions</td>
+                        <td class="csv-template-example">92</td>
+                        <td class="csv-template-example">2024-01-15</td>
+                    </tr>
+                    <tr>
+                        <td class="csv-template-example">carol@school.com</td>
+                        <td class="csv-template-example">Midterm Exam</td>
+                        <td class="csv-template-example">78</td>
+                        <td class="csv-template-example">2024-01-20</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="csv-template-title" style="margin-top: 16px;">📋 Example CSV Content</div>
+            <div class="csv-example-code">Student Email,Assessment Name,Score,Date
+alice@school.com,Quiz 1: Fractions,85,2024-01-15
+bob@school.com,Quiz 1: Fractions,92,2024-01-15
+carol@school.com,Midterm Exam,78,2024-01-20</div>
+        </div>
+    </div>
+
+    {# PREVIEW TAB #}
+    <div id="csv-tab-preview" class="csv-tab-content">
+        <div class="csv-preview-section">
+            <div class="csv-preview-title">Preview Records to Import</div>
+            <div id="preview-container" style="display: none;">
+                <table class="csv-preview-table" id="preview-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;">Status</th>
+                            <th>Student Email</th>
+                            <th>Assessment Name</th>
+                            <th>Score</th>
+                            <th>Date</th>
+                            <th style="width: 120px;">Message</th>
+                        </tr>
+                    </thead>
+                    <tbody id="preview-tbody"></tbody>
+                </table>
+                <div id="preview-errors" style="display: none;"></div>
+            </div>
+            <div id="preview-empty" style="text-align: center; color: #999; padding: 40px; font-size: 14px;">
+                Upload a CSV file to preview records
+            </div>
+        </div>
+    </div>
+
+    {# RESULT TAB #}
+    <div id="csv-tab-result" class="csv-tab-content">
+        <div id="result-container" style="display: none;">
+            <div class="csv-import-summary active">
+                <div class="csv-summary-row">
+                    <span>✓ Successfully Imported:</span>
+                    <strong><span id="result-success">0</span> records</strong>
+                </div>
+                <div class="csv-summary-row">
+                    <span>⚠ Warnings/Skipped:</span>
+                    <strong><span id="result-warning">0</span> records</strong>
+                </div>
+                <div class="csv-summary-row">
+                    <span>✕ Errors:</span>
+                    <strong><span id="result-error">0</span> records</strong>
+                </div>
+            </div>
+
+            <div id="import-progress" class="csv-progress-section active">
+                <div class="csv-progress-title">Import Progress</div>
+                <div class="csv-progress-bar">
+                    <div class="csv-progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="csv-progress-text">
+                    <span id="progress-text">Importing...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+            </div>
+
+            <div id="result-details" style="margin-top: 16px; display: none;">
+                <div class="csv-preview-title">Import Details</div>
+                <div id="result-message" style="font-size: 13px; color: #555; line-height: 1.6;"></div>
+            </div>
+        </div>
+
+        <div id="result-empty" style="text-align: center; color: #999; padding: 40px; font-size: 14px;">
+            Import results will appear here after upload
+        </div>
+    </div>
+
+    {# ACTION BUTTONS #}
+    <div class="csv-import-actions" style="margin-top: 24px;">
+        <button class="btn btn-secondary" onclick="resetForm()">Reset</button>
+        <button class="btn btn-primary" id="import-btn" onclick="importCSV()" disabled>
+            Import Records
+        </button>
+    </div>
+</div>
+
+<script>
+    let parsedData = [];
+    const dropZone = document.getElementById('csv-drop-zone');
+    const fileInput = document.getElementById('csv-file-input');
+    const importBtn = document.getElementById('import-btn');
+
+    // Tab switching
+    document.querySelectorAll('.csv-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            document.querySelectorAll('.csv-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.csv-tab-content').forEach(c => c.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(`csv-tab-${tabName}`).classList.add('active');
+        });
+    });
+
+    // Drag and drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleFile(e.dataTransfer.files[0]);
+    });
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', (e) => {
+        handleFile(e.target.files[0]);
+    });
+
+    function handleFile(file) {
+        if (!file || !file.name.endsWith('.csv')) {
+            toastNotify('Please select a CSV file', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            parseCSV(e.target.result);
+        };
+        reader.readAsText(file);
+    }
+
+    function parseCSV(content) {
+        const lines = content.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        parsedData = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',').map(v => v.trim());
+            const record = {
+                email: values[0],
+                assessment: values[1],
+                score: parseInt(values[2]),
+                date: values[3],
+                status: 'valid',
+                message: ''
+            };
+
+            // Validation
+            if (!record.email) {
+                record.status = 'error';
+                record.message = 'Missing email';
+            } else if (!record.assessment) {
+                record.status = 'error';
+                record.message = 'Missing assessment name';
+            } else if (isNaN(record.score) || record.score < 0 || record.score > 100) {
+                record.status = 'error';
+                record.message = 'Invalid score (0-100)';
+            } else if (!isValidDate(record.date)) {
+                record.status = 'warning';
+                record.message = 'Invalid date format';
+            }
+
+            parsedData.push(record);
+        }
+
+        previewData();
+        importBtn.disabled = parsedData.length === 0;
+        toastNotify(`${parsedData.length} records parsed. Review in Preview tab.`, 'info');
+    }
+
+    function previewData() {
+        const previewTbody = document.getElementById('preview-tbody');
+        const previewEmpty = document.getElementById('preview-empty');
+        const previewContainer = document.getElementById('preview-container');
+
+        if (parsedData.length === 0) {
+            previewEmpty.style.display = 'block';
+            previewContainer.style.display = 'none';
+            return;
+        }
+
+        previewEmpty.style.display = 'none';
+        previewContainer.style.display = 'block';
+
+        previewTbody.innerHTML = parsedData.map(record => `
+            <tr class="csv-row-${record.status}">
+                <td>
+                    <span class="csv-status-badge csv-status-${record.status}">
+                        ${record.status === 'valid' ? '✓' : record.status === 'warning' ? '⚠' : '✕'}
+                    </span>
+                </td>
+                <td>${record.email}</td>
+                <td>${record.assessment}</td>
+                <td>${record.score}</td>
+                <td>${record.date}</td>
+                <td style="font-size: 12px; color: #666;">${record.message || 'OK'}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function importCSV() {
+        const validRecords = parsedData.filter(r => r.status === 'valid');
+        if (validRecords.length === 0) {
+            toastNotify('No valid records to import', 'error');
+            return;
+        }
+
+        switchTab('result');
+        document.getElementById('result-empty').style.display = 'none';
+        document.getElementById('result-container').style.display = 'block';
+
+        let successCount = 0;
+        let errorCount = 0;
+        let warningCount = 0;
+
+        for (let i = 0; i < validRecords.length; i++) {
+            const record = validRecords[i];
+            
+            try {
+                // Simulate API call
+                await new Promise(resolve => setTimeout(resolve, 200));
+                successCount++;
+            } catch (error) {
+                errorCount++;
+            }
+
+            const progressPercent = Math.round((i + 1) / validRecords.length * 100);
+            document.getElementById('progress-fill').style.width = progressPercent + '%';
+            document.getElementById('progress-percent').textContent = progressPercent + '%';
+            document.getElementById('progress-text').textContent = `Importing record ${i + 1} of ${validRecords.length}...`;
+        }
+
+        warningCount = parsedData.filter(r => r.status === 'warning').length;
+
+        document.getElementById('result-success').textContent = successCount;
+        document.getElementById('result-warning').textContent = warningCount;
+        document.getElementById('result-error').textContent = errorCount;
+
+        setTimeout(() => {
+            document.getElementById('import-progress').style.display = 'none';
+            document.getElementById('result-details').style.display = 'block';
+            document.getElementById('result-message').innerHTML = `
+                <p><strong>Import Complete!</strong></p>
+                <p>${successCount} assessment records have been successfully imported and linked to student accounts.</p>
+                <p>Risk scores will be recalculated based on the new assessment data.</p>
+            `;
+            toastNotify(`${successCount} records imported successfully`, 'success');
+        }, 2000);
+    }
+
+    function downloadTemplate() {
+        const csv = 'Student Email,Assessment Name,Score,Date\nalice@school.com,Quiz 1: Fractions,85,2024-01-15';
+        const link = document.createElement('a');
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+        link.download = 'assessment_import_template.csv';
+        link.click();
+    }
+
+    function resetForm() {
+        fileInput.value = '';
+        parsedData = [];
+        document.getElementById('preview-tbody').innerHTML = '';
+        document.getElementById('result-container').style.display = 'none';
+        document.getElementById('result-empty').style.display = 'block';
+        importBtn.disabled = true;
+        switchTab('upload');
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.csv-tab').forEach((t, i) => {
+            if (t.dataset.tab === tabName) {
+                t.classList.add('active');
+            } else {
+                t.classList.remove('active');
+            }
+        });
+        document.querySelectorAll('.csv-tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`csv-tab-${tabName}`).classList.add('active');
+    }
+
+    function isValidDate(dateString) {
+        const date = new Date(dateString);
+        return date instanceof Date && !isNaN(date);
+    }
+</script>

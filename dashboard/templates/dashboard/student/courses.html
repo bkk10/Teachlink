@@ -1,0 +1,285 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}My Courses{% endblock %}
+
+{% block extra_css %}
+<style>
+    .workspace-shell {
+        background: linear-gradient(120deg, #e9f2ff 0%, #f8fbff 100%);
+        border: 1px solid #d6e4ff;
+        border-radius: 1rem;
+    }
+    .summary-card {
+        border: 0;
+        border-radius: 0.9rem;
+        box-shadow: 0 0.45rem 1rem rgba(2, 6, 23, 0.08);
+    }
+    .summary-label {
+        font-size: 0.76rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .summary-value {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    .course-accordion .accordion-item {
+        border: 1px solid #dbe5f3;
+        border-radius: 0.9rem;
+        overflow: hidden;
+        margin-bottom: 0.85rem;
+    }
+    .course-accordion .accordion-button {
+        font-weight: 700;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    .metric-chip {
+        font-size: 0.75rem;
+        border-radius: 999px;
+        padding: 0.2rem 0.55rem;
+    }
+    .list-panel {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.85rem;
+        background: #fff;
+    }
+    .lesson-row {
+        padding-top: 0.85rem;
+        padding-bottom: 0.85rem;
+    }
+    .lesson-row:nth-child(even) {
+        background: #f8fbff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <section class="workspace-shell p-4 p-md-5 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <p class="small text-uppercase fw-semibold text-primary mb-2">Student Workspace</p>
+                <h2 class="fw-bold mb-2">My Courses</h2>
+                <p class="text-muted mb-0">Pick a course, open a lesson note, and take quizzes from one place.</p>
+            </div>
+            <a href="{% url 'student_dashboard' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Overview
+            </a>
+        </div>
+    </section>
+
+    <section class="row g-3 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Active Courses</div>
+                    <div class="summary-value">{{ total_courses }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Average Progress</div>
+                    <div class="summary-value">{{ avg_progress }}%</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Next Action</div>
+                    <div class="summary-value fs-5">Open next lesson</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <div class="summary-label">Goal</div>
+                    <div class="summary-value fs-5">One lesson today</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {% if course_rows %}
+    <section>
+        {% for row in course_rows %}
+        <article class="accordion-item mb-3" id="{{ row.anchor_id }}">
+            <div class="p-3 border-bottom" style="background:#e8f1ff;">
+                <div class="w-100 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <div class="fw-bold">{{ row.enrollment.course.title }}</div>
+                        <div class="small text-muted">Quiz avg: {{ row.enrollment.average_quiz_score|floatformat:0 }}% | Progress: {{ row.enrollment.progress_percentage|floatformat:1 }}%</div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        {% if row.enrollment.risk_level == 'HIGH' or row.enrollment.risk_level == 'CRITICAL' %}
+                            <span class="badge text-bg-danger metric-chip">{{ row.enrollment.risk_level }}</span>
+                        {% elif row.enrollment.risk_level == 'MEDIUM' %}
+                            <span class="badge text-bg-warning metric-chip">{{ row.enrollment.risk_level }}</span>
+                        {% elif row.enrollment.risk_level == 'LOW' %}
+                            <span class="badge text-bg-success metric-chip">{{ row.enrollment.risk_level }}</span>
+                        {% else %}
+                            <span class="badge text-bg-secondary metric-chip">{{ row.enrollment.risk_level }}</span>
+                        {% endif %}
+                        <span class="badge text-bg-light text-dark border metric-chip">{{ row.completed_lessons }}/{{ row.total_lessons }} lessons</span>
+                    </div>
+                </div>
+            </div>
+            <div class="p-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                    <div class="small text-muted">
+                        {{ row.enrollment.course.description|default:"No description provided."|truncatechars:180 }}
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% if row.next_lesson %}
+                        <a href="{% url 'open_lesson_material' row.next_lesson.id %}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-play me-1"></i>Continue {{ row.next_lesson.title|truncatechars:26 }}
+                        </a>
+                        {% endif %}
+                        <a href="{{ row.course_workspace_url }}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-layer-group me-1"></i>Open Full Workspace
+                        </a>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12 col-xl-7">
+                        <div class="list-panel p-3 h-100">
+                            <h6 class="fw-bold mb-3">Lessons and Notes</h6>
+                            <div class="list-group list-group-flush">
+                                {% for lesson_row in row.lessons %}
+                                <div class="list-group-item px-3 lesson-row d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                    <div>
+                                        <div class="fw-semibold">
+                                            <i class="fas fa-file-lines text-primary me-1"></i>{{ lesson_row.lesson.title }}
+                                        </div>
+                                        <div class="small text-muted">{{ lesson_row.lesson.module.title }} - {{ lesson_row.lesson.estimated_minutes }} min</div>
+                                        <div class="mt-1">
+                                            {% if lesson_row.quiz_available %}
+                                            <span class="badge text-bg-primary">Quiz Ready</span>
+                                            {% elif lesson_row.quiz %}
+                                            <span class="badge text-bg-secondary">Quiz Coming Soon</span>
+                                            {% else %}
+                                            <span class="badge text-bg-light text-dark border">No Quiz</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        {% if lesson_row.completed %}
+                                        <span class="badge text-bg-success"><i class="fas fa-check me-1"></i>Completed</span>
+                                        {% else %}
+                                        <button class="btn btn-sm btn-outline-success mark-lesson-complete-btn" data-lesson-id="{{ lesson_row.lesson.id }}">
+                                            <i class="fas fa-check me-1"></i>Mark Complete
+                                        </button>
+                                        {% endif %}
+                                        <a href="{{ lesson_row.open_url }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-book-open me-1"></i>Open Note
+                                        </a>
+                                        {% if lesson_row.quiz %}
+                                            {% if lesson_row.quiz_can_take %}
+                                            <a href="{{ lesson_row.quiz_attempts_url }}?take=1" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-pen me-1"></i>Take Quiz
+                                            </a>
+                                            {% elif lesson_row.quiz_available %}
+                                            <a href="{{ lesson_row.quiz_attempts_url }}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-chart-line me-1"></i>View Attempts
+                                            </a>
+                                            {% else %}
+                                            <button class="btn btn-sm btn-outline-secondary" disabled>Quiz Unavailable</button>
+                                            {% endif %}
+                                        {% endif %}
+                                        <button class="btn btn-sm btn-outline-warning report-difficulty-btn" data-course-id="{{ row.enrollment.course.id }}" data-lesson-id="{{ lesson_row.lesson.id }}">
+                                            <i class="fas fa-flag me-1"></i>Report
+                                        </button>
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="text-muted">No lessons published yet for this course.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </section>
+    {% else %}
+    {% include "components/empty_state.html" with icon="fa-book-open" title="No active courses" message="Use your enrollment key to join a course and start learning." %}
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCSRFToken() {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, 10) === 'csrftoken=') {
+                cookieValue = decodeURIComponent(cookie.substring(10));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function reportDifficulty(courseId, lessonId) {
+    const reason = prompt("Please describe the difficulty you're facing:");
+    if (!reason) return;
+    $.ajax({
+        url: "{% url 'student_api' %}",
+        method: "POST",
+        contentType: "application/json",
+        headers: { "X-CSRFToken": getCSRFToken() },
+        data: JSON.stringify({
+            action: "report_difficulty",
+            course_id: courseId,
+            lesson_id: lessonId,
+            reason: reason
+        }),
+        success: function() {
+            alert("Difficulty report sent to your teacher.");
+        },
+        error: function(xhr) {
+            alert("Could not submit report right now.");
+            console.error(xhr.responseText || xhr.statusText);
+        }
+    });
+}
+
+$(function() {
+    $(document).on("click", ".mark-lesson-complete-btn", function() {
+        const button = $(this);
+        const lessonId = button.data("lesson-id");
+        if (!lessonId) return;
+        $.ajax({
+            url: `/api/courses/lessons/${lessonId}/complete/`,
+            method: "POST",
+            contentType: "application/json",
+            headers: { "X-CSRFToken": getCSRFToken() },
+            data: JSON.stringify({}),
+            success: function() {
+                button.replaceWith('<span class="badge text-bg-success"><i class="fas fa-check me-1"></i>Completed</span>');
+            },
+            error: function(xhr) {
+                alert("Could not mark lesson complete. Please try again.");
+                console.error(xhr.responseText || xhr.statusText);
+            }
+        });
+    });
+
+    $(document).on("click", ".report-difficulty-btn", function() {
+        reportDifficulty($(this).data("course-id"), $(this).data("lesson-id"));
+    });
+});
+</script>
+{% endblock %}

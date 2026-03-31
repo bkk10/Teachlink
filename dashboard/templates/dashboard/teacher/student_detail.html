@@ -1,0 +1,175 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Student Detail{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">
+                <i class="fas fa-user-graduate text-blue-600 mr-2"></i>
+                {{ enrollment.student.display_name }}
+            </h1>
+            <p class="text-sm text-gray-600 mt-1">{{ enrollment.course.title }}</p>
+        </div>
+        <a href="{% url 'teacher_students' %}" class="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Students
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="bg-slate-900 text-white rounded-lg shadow p-5 lg:col-span-2">
+            <p class="text-xs text-slate-300 uppercase tracking-wide">Intervention Focus</p>
+            <p class="text-3xl font-semibold mt-2">{{ risk_explainability.score_pct|floatformat:1 }}% Risk Score</p>
+            <p class="text-sm text-slate-300 mt-1">{{ enrollment.risk_level }} risk driven mainly by {{ risk_explainability.primary_factor|lower }}.</p>
+            <div class="mt-4 rounded-md bg-white/10 p-3">
+                <p class="text-xs text-slate-300 uppercase tracking-wide">Recommended Next Step</p>
+                <p class="text-sm mt-1">{{ teacher_action }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-5">
+            <p class="text-xs text-gray-500">Progress</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ enrollment.progress_percentage|floatformat:1 }}%</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-5">
+            <p class="text-xs text-gray-500">Quiz Average</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ enrollment.average_quiz_score|floatformat:1 }}%</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-5">
+            <p class="text-xs text-gray-500">Lessons Completed</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ completed_count }}/{{ total_lessons }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-5">
+            <p class="text-xs text-gray-500">Attendance Rate</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ attendance_rate }}%</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-5">
+            <p class="text-xs text-gray-500">Current Risk</p>
+            <p class="text-2xl font-semibold {% if enrollment.risk_level == 'HIGH' or enrollment.risk_level == 'CRITICAL' %}text-red-600{% elif enrollment.risk_level == 'MEDIUM' %}text-yellow-600{% else %}text-green-600{% endif %}">{{ enrollment.risk_level }}</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Risk Explainability</h2>
+        </div>
+        <div class="px-6 py-4">
+            <p class="text-sm text-gray-700 mb-3">
+                Current risk score: <span class="font-semibold">{{ risk_explainability.score_pct|floatformat:1 }}%</span>
+                ({{ risk_explainability.level }})
+            </p>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 border-b">
+                            <th class="py-2 pr-4">Factor</th>
+                            <th class="py-2 pr-4">Observed Value</th>
+                            <th class="py-2 pr-4">Weight</th>
+                            <th class="py-2">Contribution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for factor in risk_explainability.factors %}
+                        <tr class="border-b last:border-b-0">
+                            <td class="py-2 pr-4 font-medium text-gray-900">{{ factor.name }}</td>
+                            <td class="py-2 pr-4 text-gray-700">{{ factor.value_display }}</td>
+                            <td class="py-2 pr-4 text-gray-700">{{ factor.weight|floatformat:2 }}</td>
+                            <td class="py-2 text-gray-700">{{ factor.contribution_pct|floatformat:1 }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs text-gray-500 mt-3">
+                Primary driver: {{ risk_explainability.primary_factor }} ({{ risk_explainability.primary_contribution_pct|floatformat:1 }}% contribution)
+            </p>
+            {% if latest_risk_factors %}
+                <div class="mt-3">
+                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Latest Engine Factors</p>
+                    <div class="space-y-1">
+                        {% for factor in latest_risk_factors %}
+                        <p class="text-sm text-gray-700">
+                            {{ factor.factor }}{% if factor.score is not None %}: {{ factor.score }}{% endif %}
+                            {% if factor.days_inactive is not None %} ({{ factor.days_inactive }} days inactive){% endif %}
+                            {% if factor.impact %} - {{ factor.impact|title }} impact{% endif %}
+                        </p>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Lessons Completed</h2>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for completion in completed_lessons %}
+                <div class="px-6 py-4">
+                    <p class="text-sm font-medium text-gray-900">{{ completion.lesson.title }}</p>
+                    <p class="text-xs text-gray-500">{{ completion.lesson.module.title }} - {{ completion.completed_at|date:"M d, Y H:i" }}</p>
+                </div>
+                {% empty %}
+                <div class="px-6 py-4 text-sm text-gray-500">No lessons completed yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Quiz Marks</h2>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for attempt in quiz_attempts %}
+                <div class="px-6 py-4">
+                    <p class="text-sm font-medium text-gray-900">{{ attempt.quiz.title }}</p>
+                    <p class="text-xs text-gray-500">
+                        Score: {{ attempt.score_percentage|floatformat:1 }}% |
+                        Passed: {% if attempt.passed %}Yes{% else %}No{% endif %} |
+                        {{ attempt.submitted_at|date:"M d, Y H:i" }}
+                    </p>
+                </div>
+                {% empty %}
+                <div class="px-6 py-4 text-sm text-gray-500">No completed quiz attempts yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Recent Risk History</h2>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for entry in risk_history %}
+                <div class="px-6 py-4">
+                    <p class="text-sm font-medium text-gray-900">{{ entry.risk_level }} ({{ entry.risk_score|floatformat:3 }})</p>
+                    <p class="text-xs text-gray-500">{{ entry.calculated_at|date:"M d, Y H:i" }}</p>
+                </div>
+                {% empty %}
+                <div class="px-6 py-4 text-sm text-gray-500">No risk history entries found.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Recent Alerts</h2>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for alert in alerts %}
+                <div class="px-6 py-4">
+                    <p class="text-sm font-medium text-gray-900">{{ alert.title }}</p>
+                    <p class="text-xs text-gray-500">{{ alert.severity }} - {{ alert.status }} - {{ alert.generated_at|date:"M d, Y H:i" }}</p>
+                </div>
+                {% empty %}
+                <div class="px-6 py-4 text-sm text-gray-500">No alerts found for this student and course.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

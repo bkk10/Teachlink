@@ -1,0 +1,136 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}My Students{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h3 class="mb-1 fw-bold"><i class="fas fa-users text-primary me-2"></i>My Students</h3>
+            <p class="text-muted mb-0">Showing {{ enrollments.count }} student{{ enrollments.count|pluralize }}</p>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <form method="get" class="d-flex gap-2">
+                <input type="text" name="search" class="form-control" placeholder="Search by name or email..." value="{{ search_query|default:'' }}">
+                {% if selected_course_id %}
+                    <input type="hidden" name="course" value="{{ selected_course_id }}">
+                {% endif %}
+                <button type="submit" class="btn btn-primary">Search</button>
+                {% if search_query %}
+                    <a href="?{% if selected_course_id %}course={{ selected_course_id }}{% endif %}" class="btn btn-outline-secondary">Clear</a>
+                {% endif %}
+            </form>
+        </div>
+        <div class="col-md-3">
+            <form method="get" class="d-flex gap-2">
+                <select name="course" onchange="this.form.submit()" class="form-select">
+                    <option value="">All Courses</option>
+                    {% for course in courses %}
+                    <option value="{{ course.id }}" {% if selected_course_id == course.id|stringformat:"s" %}selected{% endif %}>
+                        {{ course.title }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if search_query %}
+                    <input type="hidden" name="search" value="{{ search_query }}">
+                {% endif %}
+            </form>
+        </div>
+        <div class="col-md-6 d-flex justify-content-end gap-2">
+            <a href="?{% if selected_course_id %}course={{ selected_course_id }}&{% endif %}{% if search_query %}search={{ search_query }}&{% endif %}export=csv" class="btn btn-outline-success">
+                <i class="fas fa-download me-1"></i>Export CSV
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student</th>
+                            <th>Course</th>
+                            <th>Progress</th>
+                            <th>Quiz Avg</th>
+                            <th>Risk</th>
+                            <th>Primary Driver</th>
+                            <th>Engagement</th>
+                            <th>Last Activity</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for enrollment in enrollments %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ enrollment.student.display_name }}</div>
+                                <small class="text-muted">{{ enrollment.student.email }}</small>
+                            </td>
+                            <td>{{ enrollment.course.title }}</td>
+                            <td>
+                                <div class="small text-muted mb-1">{{ enrollment.progress_percentage|floatformat:1 }}%</div>
+                                <div class="progress" style="height: 7px;">
+                                    <div class="progress-bar" role="progressbar" style="width: {{ enrollment.progress_percentage }}%"></div>
+                                </div>
+                            </td>
+                            <td>{{ enrollment.average_quiz_score|floatformat:1 }}%</td>
+                            <td>
+                                <div class="fw-semibold">{{ enrollment.risk_score_pct|floatformat:1 }}%</div>
+                                {% if enrollment.risk_level == 'HIGH' or enrollment.risk_level == 'CRITICAL' %}
+                                    <span class="badge text-bg-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ enrollment.risk_tooltip }}"> {{ enrollment.risk_level }}</span>
+                                {% elif enrollment.risk_level == 'MEDIUM' %}
+                                    <span class="badge text-bg-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ enrollment.risk_tooltip }}"> {{ enrollment.risk_level }}</span>
+                                {% elif enrollment.risk_level == 'LOW' %}
+                                    <span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ enrollment.risk_tooltip }}"> {{ enrollment.risk_level }}</span>
+                                {% else %}
+                                    <span class="badge text-bg-secondary">{{ enrollment.risk_level }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="small fw-semibold">{{ enrollment.primary_factor }}</div>
+                                <div class="small text-muted">{{ enrollment.teacher_action }}</div>
+                            </td>
+                            <td>
+                                {% if enrollment.engagement_score >= 0.8 %}
+                                    <span class="badge text-bg-success">High</span>
+                                {% elif enrollment.engagement_score >= 0.5 %}
+                                    <span class="badge text-bg-warning">Medium</span>
+                                {% else %}
+                                    <span class="badge text-bg-danger">Low</span>
+                                {% endif %}
+                            </td>
+                            <td><small class="text-muted">{{ enrollment.last_activity|date:"M d, Y H:i" }}</small></td>
+                            <td>
+                                <a href="{% url 'teacher_student_detail' enrollment.student.id enrollment.course.id %}" class="btn btn-sm btn-outline-primary">
+                                    View Full Data
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="p-0">
+                                <div style="padding: 2rem 1rem;">
+                                    {% include "components/empty_state.html" with icon="fa-users" title="No students enrolled" message="Share your course link or enrollment key with students to get started." %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(function() {
+    $('[data-bs-toggle="tooltip"]').tooltip();
+});
+</script>
+{% endblock %}
