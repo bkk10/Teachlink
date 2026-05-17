@@ -1,56 +1,71 @@
 Production deployment checklist for Teachly
 
-Deploying to Vercel (Python serverless):
+Deploying to Render (Docker-native platform):
 
 Fill these repository secrets (GitHub) before pushing:
 
 - GITHUB secrets (for Actions):
-  - `VERCEL_TOKEN` — Vercel personal token from [vercel.com/account/tokens](https://vercel.com/account/tokens)
-  - `VERCEL_ORG_ID` — Your Vercel org ID (visible in dashboard/URL)
-  - `VERCEL_PROJECT_ID` — Your Vercel project ID (from project settings)
+  - `RENDER_SERVICE_ID` — your Render service ID (visible in Render dashboard)
+  - `RENDER_API_KEY` — your Render API key (from account settings)
 
 How it works
 
-- CI run (`.github/workflows/ci-cd.yml`) runs tests, then deploys directly to Vercel using `amondnet/vercel-action`.
-- `vercel.json` configures Vercel to run `pip install`, collectstatic, and serve via `api/index.py`.
-- `api/index.py` is a serverless function that wraps the Django WSGI app.
+- CI run (`.github/workflows/ci-cd.yml`) runs tests, then triggers Render deploy.
+- `render.yaml` tells Render to build and serve the `Dockerfile`.
+- Container entrypoint (`entrypoint.sh`) runs migrations and collectstatic, then starts Gunicorn on port 8000.
 
 Setup steps
 
-1. **Create a Vercel account** (free tier available): [vercel.com](https://vercel.com)
-2. **Create a new project**:
-   - Go to [Vercel Dashboard](https://dashboard.vercel.com)
-   - Click "Add New" → "Project"
-   - Import your GitHub repo (`bkk10/Teachlink`)
-   - Vercel will auto-detect the project and suggest settings
-3. **Set environment variables in Vercel** (Project Settings → Environment Variables):
+1. **Create a Render account** (free tier available): [render.com](https://render.com)
+2. **Create a new Web Service**:
+   - Go to [Render Dashboard](https://dashboard.render.com)
+   - Click **"New +"** → **"Web Service"**
+   - Connect your GitHub repo (`bkk10/Teachlink`)
+   - Select `main` branch
+   - Service name: `teachly`
+   - Runtime: **Docker** ✓
+   - Plan: **Free** (sleeps after 15 min inactive) or **Starter** ($7/mo for always-on)
+   - Region: Oregon (or closest to you)
+   - Click **Create Web Service**
+3. **Set environment variables in Render** (Service → Environment):
    - `DJANGO_SECRET_KEY` — generate one:
      ```bash
      python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
      ```
    - `DEBUG` = `False`
-   - `ALLOWED_HOSTS` = `your-project-name.vercel.app` (your actual Vercel domain)
+   - `ALLOWED_HOSTS` = `teachly.onrender.com` (or your production domain)
    - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` — if using external Postgres (optional)
 4. **Get GitHub secrets**:
-   - In Vercel → Account → [Settings → Tokens](https://vercel.com/account/tokens) → Create Token → copy it
-   - In Vercel Dashboard, select your project → Settings → copy **Project ID**
-   - Find your **Org ID** in the URL or account settings
+   - In Render → Account → [API Keys](https://dashboard.render.com/account/api-keys) → Create Key → copy it
+   - In your Render service → Settings → scroll to find **Service ID** → copy it
 5. **Add GitHub Secrets** (repo Settings → Secrets and variables → Actions):
-   - `VERCEL_TOKEN` = your Vercel token
-   - `VERCEL_ORG_ID` = your org ID
-   - `VERCEL_PROJECT_ID` = your project ID
+   - `RENDER_SERVICE_ID` = your service ID
+   - `RENDER_API_KEY` = your API key
 6. **Push to main**:
    ```bash
    git push origin main
    ```
 
-The workflow will run tests and deploy to Vercel. Your app will be live at `https://your-project-name.vercel.app`.
+The workflow will run tests and trigger Render to deploy. Your app will be live at `https://teachly.onrender.com`.
+
+Local testing
+
+```bash
+# copy .env.example -> .env and edit with your settings
+docker compose -f docker-compose.prod.yml up --build
+```
+
+On Unix/WSL, make `entrypoint.sh` executable:
+
+```bash
+chmod +x entrypoint.sh
+```
 
 Notes
 
-- Vercel's free tier works for development/testing. Upgrade to Pro ($20/mo) for production with better performance.
-- For a real database, add Vercel Postgres or use an external Postgres service.
-- If you hit serverless cold-start delays, consider upgrading to a managed instance or Platform.
+- Render's free tier includes auto-sleeping after 15 minutes of inactivity. Upgrade to Starter ($7/mo) for always-on production.
+- For a production database, use Render Postgres or an external managed database.
+
 
 - Render auto-deploys on push to your connected branch.
 

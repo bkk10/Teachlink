@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: teachly
+    runtime: docker
+    region: oregon
+    plan: free
+    healthCheckPath: /admin/
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: teachly.settings.production
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        sync: false
