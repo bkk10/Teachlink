@@ -1,44 +1,65 @@
 Production deployment checklist for Teachly
 
-Fill these repository secrets (GitHub) and Vercel project settings before pushing to `main`:
+Deploying to Render (Docker-native platform):
+
+Fill these repository secrets (GitHub) before pushing:
 
 - GITHUB secrets (for Actions):
-  - `VERCEL_TOKEN` — Vercel personal token (with scope to deploy)
-  - `VERCEL_ORG_ID` — Vercel organization ID
-  - `VERCEL_PROJECT_ID` — Vercel project ID
+  - `RENDER_SERVICE_ID` — your Render service ID (visible in Render dashboard)
+  - `RENDER_API_KEY` — your Render API key (from account settings)
 
-- Vercel environment variables (Project Settings -> Environment Variables) or set via GitHub Actions secrets and Vercel integration:
-  - `DJANGO_SECRET_KEY` — a strong secret key
-  - `DEBUG` = `False`
-  - `ALLOWED_HOSTS` — comma-separated domain(s) (e.g. `teachly.example.com`)
-  - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` — if using external Postgres
-  - `REDIS_URL` — optional (Celery/cache)
-  - `DEFAULT_FROM_EMAIL` — optional
+How it works
 
-How deployment works
+- CI run (`.github/workflows/ci-cd.yml`) runs tests, builds Docker image, pushes to GHCR, then triggers Render deploy.
+- `render.yaml` tells Render to build and serve the `Dockerfile`.
+- Container entrypoint (`entrypoint.sh`) runs migrations and collectstatic, then starts Gunicorn on port 8000.
 
-- CI run (`.github/workflows/ci-cd.yml`) executes tests, builds the Docker image, pushes to GHCR, then triggers Vercel deployment using `amondnet/vercel-action`.
-- `vercel.json` tells Vercel to build the provided `Dockerfile`.
-- Container entrypoint (`entrypoint.sh`) runs migrations and `collectstatic` then starts Gunicorn.
+Setup steps
+
+1. **Create a Render account** (free): [render.com](https://render.com)
+2. **Create a new Web Service**:
+   - Connect your GitHub repo
+   - Select branch `main`
+   - Enter name: `teachly`
+   - Runtime: Docker ✓
+   - Plan: Free (or paid for production)
+   - Region: Oregon or closest to you
+3. **Set environment variables in Render**:
+   - `DJANGO_SECRET_KEY` — create one locally:
+     ```bash
+     python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+     ```
+   - `DEBUG` = `False`
+   - `ALLOWED_HOSTS` = `your-service-name.onrender.com` (Render provides this)
+   - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` — if using external Postgres
+4. **Get deploy secrets**:
+   - In Render dashboard → Account settings → API keys → copy your API key
+   - In your deployed service → Settings → copy Service ID
+5. **Add GitHub Secrets** (Settings → Secrets):
+   - `RENDER_SERVICE_ID`
+   - `RENDER_API_KEY`
+6. **Push to main**:
+   ```bash
+   git push origin main
+   ```
+
+The workflow will test, build, push image to GHCR, then trigger Render to deploy.
 
 Local testing
-
-Build and run locally with Docker Compose (production config):
 
 ```bash
 # copy .env.example -> .env and edit
 docker compose -f docker-compose.prod.yml up --build
 ```
 
-If you're using WSL/Unix, make `entrypoint.sh` executable locally:
+On Unix/WSL, make entrypoint executable:
 
 ```bash
 chmod +x entrypoint.sh
 ```
 
-Notes & next steps
+Notes
 
-- I left the original `teachlink/` package in place to avoid breaking anything during the rename. If you want, I can delete it after you verify everything is working.
-- If you prefer the app to be served behind a managed platform load balancer (Render, DO App Platform), I can add provider-specific deploy steps.
+- Render's free tier includes auto-sleeping after 15 minutes of inactivity. Upgrade to Starter ($7/mo) for always-on.
+- Render auto-deploys on push to your connected branch.
 
-If you want, I will now remove the old `teachlink/` package and run a final repo search to ensure no stray imports remain.
