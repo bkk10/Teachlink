@@ -115,31 +115,23 @@
                 <div class="demo-box mt-4 p-3">
                     <div class="fw-semibold text-dark mb-2 text-sm">Demo Accounts (click to auto-login)</div>
                     <div class="d-flex gap-2 flex-wrap">
-                        <button type="button" data-demo-email="demo.teacher@teachlink.com" data-demo-role="teacher"
-                                class="btn btn-sm btn-outline-primary demo-login-btn">
-                            <i class="fas fa-chalkboard-teacher me-1"></i>Teacher Demo
-                        </button>
-                        <button type="button" data-demo-email="demo.student11@teachlink.com" data-demo-role="student"
-                                class="btn btn-sm btn-outline-success demo-login-btn">
-                            <i class="fas fa-user-graduate me-1"></i>Student Demo (Neema Juma)
-                        </button>
+                        <form method="post" action="{% url 'demo_login' %}" class="m-0">
+                            {% csrf_token %}
+                            <input type="hidden" name="role" value="TEACHER">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-chalkboard-teacher me-1"></i>Teacher Demo
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'demo_login' %}" class="m-0">
+                            {% csrf_token %}
+                            <input type="hidden" name="role" value="STUDENT">
+                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-user-graduate me-1"></i>Student Demo
+                            </button>
+                        </form>
                     </div>
                     <p class="text-xs text-gray-500 mt-2 mb-0">Demo accounts reset daily. For testing only.</p>
                 </div>
-
-                <script>
-                    document.querySelectorAll('.demo-login-btn').forEach(function(btn) {
-                        btn.addEventListener('click', function() {
-                            const email = this.dataset.demoEmail;
-                            const role = this.dataset.demoRole;
-                            // Passwords are hardcoded server-side for demo accounts
-                            // This prevents exposing credentials in the HTML
-                            document.querySelector('input[name="email"]').value = email;
-                            document.querySelector('input[name="password"]').value = role === 'teacher' ? 'DemoTeach123!' : 'DemoStudent123!';
-                            document.querySelector('form').submit();
-                        });
-                    });
-                </script>
             </div>
         </div>
     </div>

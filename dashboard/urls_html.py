@@ -8,6 +8,7 @@ from . import import_views
 urlpatterns = [
     # Auth URLs
     path('login/', views.custom_login, name='custom_login'),
+    path('login/demo/', views.demo_login, name='demo_login'),
     path(
         'password-reset/',
         auth_views.PasswordResetView.as_view(

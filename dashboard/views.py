@@ -173,6 +173,29 @@ def difficulty_display_label(level: str) -> str:
         'UNKNOWN': 'Unknown',
     }
     return mapping.get((level or 'UNKNOWN').upper(), 'Unknown')
+
+
+def _login_and_redirect_by_role(request, user):
+    """Log user in and redirect to the correct dashboard with student side effects."""
+    login(request, user)
+    if user.role == 'STUDENT':
+        ip_address = request.META.get('REMOTE_ADDR')
+        user.update_last_activity(ip_address)
+        enrollments = Enrollment.objects.filter(
+            student=user,
+            status=Enrollment.Status.ACTIVE
+        )
+        for enrollment in enrollments:
+            enrollment.update_last_activity()
+            # Only recalculate risk if not done in the last hour
+            last_calc = RiskHistory.objects.filter(enrollment=enrollment).order_by('-calculated_at').first()
+            if not last_calc or (timezone.now() - last_calc.calculated_at).total_seconds() > 3600:
+                RiskEngine.calculate_student_risk(str(enrollment.id))
+                AlertGenerator.check_and_generate_alerts(enrollment_id=str(enrollment.id))
+
+    if user.role == 'TEACHER':
+        return redirect('teacher_dashboard')
+    return redirect('student_dashboard')
 # ============================================
 # HTML VIEWS (Server-rendered)
 # ============================================
@@ -187,30 +210,44 @@ def custom_login(request):
         user = authenticate(request, username=email, password=password)
         
         if user is not None:
-            login(request, user)
-            if user.role == 'STUDENT':
-                ip_address = request.META.get('REMOTE_ADDR')
-                user.update_last_activity(ip_address)
-                enrollments = Enrollment.objects.filter(
-                    student=user,
-                    status=Enrollment.Status.ACTIVE
-                )
-                for enrollment in enrollments:
-                    enrollment.update_last_activity()
-                    # Only recalculate risk if not done in the last hour
-                    last_calc = RiskHistory.objects.filter(enrollment=enrollment).order_by('-calculated_at').first()
-                    if not last_calc or (timezone.now() - last_calc.calculated_at).total_seconds() > 3600:
-                        RiskEngine.calculate_student_risk(str(enrollment.id))
-                        AlertGenerator.check_and_generate_alerts(enrollment_id=str(enrollment.id))
-            # Redirect based on role
-            if user.role == 'TEACHER':
-                return redirect('teacher_dashboard')
-            else:
-                return redirect('student_dashboard')
+            return _login_and_redirect_by_role(request, user)
         else:
             messages.error(request, 'Invalid email or password')
     
     return render(request, 'dashboard/login.html')
+
+
+def demo_login(request):
+    """Direct demo sign-in by role without exposing demo passwords in the UI."""
+    if request.method != 'POST':
+        return redirect('custom_login')
+
+    requested_role = (request.POST.get('role') or '').strip().upper()
+    if requested_role not in {'TEACHER', 'STUDENT'}:
+        messages.error(request, 'Invalid demo role selected.')
+        return redirect('custom_login')
+
+    User = get_user_model()
+    if requested_role == 'TEACHER':
+        demo_user = User.objects.filter(
+            role='TEACHER',
+            email__iexact='demo.teacher@teachlink.com',
+            is_active=True
+        ).first()
+    else:
+        # Pick any active demo student so the button works even if a specific index is missing.
+        demo_user = User.objects.filter(
+            role='STUDENT',
+            email__istartswith='demo.student',
+            email__iendswith='@teachlink.com',
+            is_active=True
+        ).order_by('email').first()
+
+    if demo_user is None:
+        messages.error(request, 'Demo account is not available. Please run demo seed setup.')
+        return redirect('custom_login')
+
+    return _login_and_redirect_by_role(request, demo_user)
 
 
 def custom_register(request):

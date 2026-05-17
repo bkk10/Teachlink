@@ -28,6 +28,15 @@ class RiskEngine:
     STABLE_DELTA = Decimal('0.05')
     HISTORY_SCORE_EPSILON = Decimal('0.001')
 
+    @staticmethod
+    def _teachly_config() -> Dict[str, Any]:
+        """Return app config with legacy key fallback."""
+        return (
+            getattr(settings, 'TEACHLY_CONFIG', None)
+            or getattr(settings, 'TEACHLINK_CONFIG', {})
+            or {}
+        )
+
     @classmethod
     def _resolve_weights(cls, course) -> Dict[str, Decimal]:
         """Resolve weights: defaults, optional course-level overrides, fall back to settings."""
@@ -45,7 +54,7 @@ class RiskEngine:
                         pass
 
         # Settings override for global test/capstone tuning
-        config_weights = settings.TEACHLINK_CONFIG.get('RISK_WEIGHTS', {}) if hasattr(settings, 'TEACHLINK_CONFIG') else {}
+        config_weights = cls._teachly_config().get('RISK_WEIGHTS', {})
         for key in ['progress', 'quiz', 'inactivity']:
             if key in config_weights:
                 try:
@@ -188,9 +197,7 @@ class RiskEngine:
         Map inactivity days to normalized risk (0.0-1.0).
         Uses critical threshold from settings (default 14 days).
         """
-        critical_days = int(
-            settings.TEACHLINK_CONFIG.get('INACTIVITY_DAYS_CRITICAL', 14)
-        )
+        critical_days = int(cls._teachly_config().get('INACTIVITY_DAYS_CRITICAL', 14))
         if critical_days <= 0:
             critical_days = 14
         return cls._clamp_decimal(
