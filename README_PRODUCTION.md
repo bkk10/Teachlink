@@ -1,65 +1,56 @@
 Production deployment checklist for Teachly
 
-Deploying to Render (Docker-native platform):
+Deploying to Vercel (Python serverless):
 
 Fill these repository secrets (GitHub) before pushing:
 
 - GITHUB secrets (for Actions):
-  - `RENDER_SERVICE_ID` — your Render service ID (visible in Render dashboard)
-  - `RENDER_API_KEY` — your Render API key (from account settings)
+  - `VERCEL_TOKEN` — Vercel personal token from [vercel.com/account/tokens](https://vercel.com/account/tokens)
+  - `VERCEL_ORG_ID` — Your Vercel org ID (visible in dashboard/URL)
+  - `VERCEL_PROJECT_ID` — Your Vercel project ID (from project settings)
 
 How it works
 
-- CI run (`.github/workflows/ci-cd.yml`) runs tests, builds Docker image, pushes to GHCR, then triggers Render deploy.
-- `render.yaml` tells Render to build and serve the `Dockerfile`.
-- Container entrypoint (`entrypoint.sh`) runs migrations and collectstatic, then starts Gunicorn on port 8000.
+- CI run (`.github/workflows/ci-cd.yml`) runs tests, then deploys directly to Vercel using `amondnet/vercel-action`.
+- `vercel.json` configures Vercel to run `pip install`, collectstatic, and serve via `api/index.py`.
+- `api/index.py` is a serverless function that wraps the Django WSGI app.
 
 Setup steps
 
-1. **Create a Render account** (free): [render.com](https://render.com)
-2. **Create a new Web Service**:
-   - Connect your GitHub repo
-   - Select branch `main`
-   - Enter name: `teachly`
-   - Runtime: Docker ✓
-   - Plan: Free (or paid for production)
-   - Region: Oregon or closest to you
-3. **Set environment variables in Render**:
-   - `DJANGO_SECRET_KEY` — create one locally:
+1. **Create a Vercel account** (free tier available): [vercel.com](https://vercel.com)
+2. **Create a new project**:
+   - Go to [Vercel Dashboard](https://dashboard.vercel.com)
+   - Click "Add New" → "Project"
+   - Import your GitHub repo (`bkk10/Teachlink`)
+   - Vercel will auto-detect the project and suggest settings
+3. **Set environment variables in Vercel** (Project Settings → Environment Variables):
+   - `DJANGO_SECRET_KEY` — generate one:
      ```bash
      python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
      ```
    - `DEBUG` = `False`
-   - `ALLOWED_HOSTS` = `your-service-name.onrender.com` (Render provides this)
-   - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` — if using external Postgres
-4. **Get deploy secrets**:
-   - In Render dashboard → Account settings → API keys → copy your API key
-   - In your deployed service → Settings → copy Service ID
-5. **Add GitHub Secrets** (Settings → Secrets):
-   - `RENDER_SERVICE_ID`
-   - `RENDER_API_KEY`
+   - `ALLOWED_HOSTS` = `your-project-name.vercel.app` (your actual Vercel domain)
+   - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` — if using external Postgres (optional)
+4. **Get GitHub secrets**:
+   - In Vercel → Account → [Settings → Tokens](https://vercel.com/account/tokens) → Create Token → copy it
+   - In Vercel Dashboard, select your project → Settings → copy **Project ID**
+   - Find your **Org ID** in the URL or account settings
+5. **Add GitHub Secrets** (repo Settings → Secrets and variables → Actions):
+   - `VERCEL_TOKEN` = your Vercel token
+   - `VERCEL_ORG_ID` = your org ID
+   - `VERCEL_PROJECT_ID` = your project ID
 6. **Push to main**:
    ```bash
    git push origin main
    ```
 
-The workflow will test, build, push image to GHCR, then trigger Render to deploy.
-
-Local testing
-
-```bash
-# copy .env.example -> .env and edit
-docker compose -f docker-compose.prod.yml up --build
-```
-
-On Unix/WSL, make entrypoint executable:
-
-```bash
-chmod +x entrypoint.sh
-```
+The workflow will run tests and deploy to Vercel. Your app will be live at `https://your-project-name.vercel.app`.
 
 Notes
 
-- Render's free tier includes auto-sleeping after 15 minutes of inactivity. Upgrade to Starter ($7/mo) for always-on.
+- Vercel's free tier works for development/testing. Upgrade to Pro ($20/mo) for production with better performance.
+- For a real database, add Vercel Postgres or use an external Postgres service.
+- If you hit serverless cold-start delays, consider upgrading to a managed instance or Platform.
+
 - Render auto-deploys on push to your connected branch.
 
