@@ -5,7 +5,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DEBUG = False
-ALLOWED_HOSTS = [h for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h]
+
+def _csv_env(key):
+    return [v.strip() for v in os.getenv(key, "").split(",") if v.strip()]
+
+
+# Prefer explicit hosts from env; add Render hostname fallback to avoid DisallowedHost.
+ALLOWED_HOSTS = _csv_env("ALLOWED_HOSTS")
+render_external_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if render_external_hostname and render_external_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_external_hostname)
+if ".onrender.com" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".onrender.com")
 
 # PostgreSQL for production if env vars provided, otherwise fall back to SQLite
 if os.getenv('DB_NAME') and os.getenv('DB_USER') and os.getenv('DB_PASSWORD'):
