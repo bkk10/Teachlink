@@ -6,3 +6,4 @@ class AssessmentsConfig(AppConfig):
     
     def ready(self):
         import assessments.signals  # noqa
+        import assessments.import_models  # Register import models

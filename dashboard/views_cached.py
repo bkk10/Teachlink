@@ -83,6 +83,17 @@ class TeacherDashboardCachedAPI(APIView):
             status__in=['ACTIVE', 'ACKNOWLEDGED']
         ).select_related('student', 'course').order_by('-generated_at')[:10]
         
+        # Count unique students with active alerts (not alert count)
+        students_with_alerts = Alert.objects.filter(
+            teacher=teacher,
+            status__in=['ACTIVE', 'ACKNOWLEDGED']
+        ).values('student').distinct().count()
+        
+        # Count unique students requiring attention (HIGH/CRITICAL risk)
+        students_requiring_attention = enrollments.filter(
+            risk_level__in=['HIGH', 'CRITICAL']
+        ).values('student').distinct().count()
+        
         # Risk distribution by course
         course_risk = []
         for course in courses[:5]:
@@ -108,11 +119,20 @@ class TeacherDashboardCachedAPI(APIView):
         return {
             'kpi': {
                 'total_students': total_students,
+                'total_unique_students': enrollments.values('student').distinct().count(),
                 'high_risk_count': high_risk_count,
                 'medium_risk_count': medium_risk_count,
                 'low_risk_count': low_risk_count,
                 'avg_performance': round(avg_performance, 1),
                 'active_alerts': recent_alerts.count(),
+                'students_with_alerts': students_with_alerts,
+            },
+            'risk_engine_summary': {
+                'formula': '40% Progress + 40% Quiz + 20% Inactivity',
+                'students_requiring_attention': students_requiring_attention,
+                'highest_risk_score_pct': round(
+                    float(enrollments.order_by('-risk_score').first().risk_score * 100) if enrollments.exists() else 0, 1
+                ),
             },
             'risk_distribution': {
                 'labels': ['Low Risk', 'Medium Risk', 'High Risk', 'Critical'],

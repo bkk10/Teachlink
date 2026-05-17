@@ -25,8 +25,8 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    # Home Page - Redirect to login
-    path('', lambda request: redirect('dashboard/login/'), name='home'),
+    # Landing Page - Home
+    path('', TemplateView.as_view(template_name='landing.html'), name='home'),
     
     # Static Pages
     path('about/', TemplateView.as_view(template_name='about.html'), name='about'),

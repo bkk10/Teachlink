@@ -32,7 +32,7 @@ from urllib.parse import urlencode
 
 from analytics.services.cache_services import DashboardCache, RiskCache, DifficultyCache
 
-from courses.models import Course, Enrollment, Lesson, LessonCompletion, Module
+from courses.models import Course, Enrollment, Lesson, LessonCompletion, Module, AttendanceRecord
 from assessments.models import Quiz, QuizAttempt, Question, Answer
 from analytics.models import Alert, RiskHistory, LessonDifficulty, LessonInteraction
 from analytics.services.risk_engine import RiskEngine
@@ -268,6 +268,10 @@ def custom_register(request):
     return render(request, 'dashboard/register.html')
 
 
+from django.views.decorators.csrf import ensure_csrf_cookie
+
+
+@ensure_csrf_cookie
 def custom_logout(request):
     """Session logout for dashboard web views"""
     if request.method == 'POST':
@@ -378,7 +382,8 @@ def courses_overview(request):
     role_value = (getattr(request.user, 'role', '') or '').upper()
 
     if request.user.is_teacher or role_value == 'TEACHER':
-        return render(request, 'dashboard/teacher/courses.html')
+        courses = Course.objects.filter(teacher=request.user).order_by('title')
+        return render(request, 'dashboard/teacher/courses.html', {'courses': courses})
 
     if request.user.is_student or role_value == 'STUDENT':
         enrollments = list(Enrollment.objects.filter(
@@ -395,8 +400,7 @@ def courses_overview(request):
         for enrollment in enrollments:
             lessons = list(
                 Lesson.objects.filter(
-                    module__course=enrollment.course,
-                    is_published=True
+                    module__course=enrollment.course
                 ).select_related('module').order_by('module__order', 'order')
             )
             completed_lesson_ids = set(
@@ -473,7 +477,29 @@ def courses_overview(request):
                     'attempts_url': reverse('student_quiz_attempts', kwargs={'quiz_id': quiz.id}),
                 })
 
+            # Calculate pending assessments (incomplete online quizzes)
+            pending_count = 0
+            for lesson in lessons:
+                quiz = quizzes_by_lesson.get(lesson.id)
+                if quiz and quiz.is_published and int(quiz.total_questions or 0) > 0:
+                    # Check if student has completed this quiz
+                    has_completed = QuizAttempt.objects.filter(
+                        student=request.user,
+                        quiz=quiz,
+                        status__in=[QuizAttempt.Status.COMPLETED, QuizAttempt.Status.TIMED_OUT],
+                        passed=True
+                    ).exists()
+                    if not has_completed:
+                        pending_count += 1
+
             completion_rate = round((len(completed_lesson_ids) / len(lessons)) * 100, 1) if lessons else 0.0
+            
+            # Sync enrollment progress to ensure consistency across pages
+            enrollment.update_progress()
+            enrollment.refresh_from_db()
+            
+            # Calculate SVG circle progress offset (circumference = 2 * pi * 26 ≈ 163.36)
+            progress_offset = 163.36 - (163.36 * completion_rate / 100)
             course_rows.append({
                 'enrollment': enrollment,
                 'lessons': lesson_rows,
@@ -481,10 +507,25 @@ def courses_overview(request):
                 'total_lessons': len(lessons),
                 'completed_lessons': len(completed_lesson_ids),
                 'completion_rate': completion_rate,
+                'progress_offset': progress_offset,
                 'next_lesson': next_lesson,
                 'course_workspace_url': reverse('student_course_quizzes', kwargs={'course_id': enrollment.course.id}),
                 'anchor_id': f"course-{enrollment.course.id}",
+                'pending_assessments': pending_count,
             })
+
+        # Calculate summary stats for template
+        total_completed_lessons = sum(row['completed_lessons'] for row in course_rows)
+        total_lessons_all = sum(row['total_lessons'] for row in course_rows)
+        
+        # Calculate overall quiz average
+        total_quiz_score = 0.0
+        quiz_count = 0
+        for row in course_rows:
+            if row['enrollment'].average_quiz_score:
+                total_quiz_score += float(row['enrollment'].average_quiz_score)
+                quiz_count += 1
+        overall_quiz_avg = round(total_quiz_score / quiz_count, 0) if quiz_count > 0 else 0
 
         return render(
             request,
@@ -493,6 +534,9 @@ def courses_overview(request):
                 'course_rows': course_rows,
                 'total_courses': len(enrollments),
                 'avg_progress': round(float(avg_progress), 1),
+                'total_completed_lessons': total_completed_lessons,
+                'total_lessons_all': total_lessons_all,
+                'overall_quiz_avg': overall_quiz_avg,
             }
         )
 
@@ -723,8 +767,7 @@ def courses_overview(request):
         student_courses = []
         for enrollment in enrollments:
             lessons = Lesson.objects.filter(
-                module__course=enrollment.course,
-                is_published=True
+                module__course=enrollment.course
             ).select_related('module').order_by('module__order', 'order')
 
             lesson_rows = []
@@ -846,28 +889,39 @@ def teacher_course_analytics(request, course_id):
         'low': enrollments.filter(risk_level='LOW').count(),
     }
 
+    # First, ensure difficulty data is up-to-date for this course
+    DifficultyAnalyzer.analyze_course_difficulties(str(course.id))
+    
+    # Get lessons with their pre-computed difficulty data (same source as API)
     lessons = Lesson.objects.filter(
         module__course=course
-    ).select_related('module').order_by('module__order', 'order')
+    ).select_related('module', 'difficulty_analysis').order_by('module__order', 'order').distinct()
 
     lesson_rows = []
     for lesson in lessons:
-        analyzed = DifficultyAnalyzer.analyze_lesson_difficulty(str(lesson.id))
+        # Use pre-computed difficulty data from LessonDifficulty model (same as API)
+        difficulty = getattr(lesson, 'difficulty_analysis', None)
         has_quiz = hasattr(lesson, 'quiz')
-        attempts_qs = QuizAttempt.objects.filter(
-            quiz__lesson=lesson,
-            status=QuizAttempt.Status.COMPLETED
-        )
-        attempts = attempts_qs.count() if has_quiz else None
-        if has_quiz:
-            failures = attempts_qs.filter(
-                score_percentage__lt=lesson.quiz.passing_score
-            ).count()
-            failure_rate = round((failures / attempts) * 100, 1) if attempts > 0 else 0.0
+        
+        # Get stats from LessonDifficulty model for consistency with API
+        if difficulty:
+            attempts = difficulty.total_attempts
+            # Calculate failures from failure_rate and total_attempts
+            failures = int(round(float(difficulty.failure_rate) * attempts)) if attempts > 0 else 0
+            failure_rate = round(float(difficulty.failure_rate) * 100, 1)
+            accesses = difficulty.total_views
+            difficulty_level = difficulty.difficulty_level
         else:
+            attempts = 0
+            failures = 0
+            failure_rate = 0.0
+            accesses = 0
+            difficulty_level = 'UNKNOWN'
+        
+        if not has_quiz:
+            attempts = None
             failures = None
             failure_rate = None
-        accesses = int((analyzed or {}).get('statistics', {}).get('total_views', 0))
 
         # Per-student access/attempt/failure breakdown for drill-down UI.
         access_qs = list(LessonInteraction.objects.filter(
@@ -937,7 +991,7 @@ def teacher_course_analytics(request, course_id):
             )
         )
 
-        difficulty_level = (analyzed or {}).get('difficulty_level', 'UNKNOWN')
+        difficulty_level = difficulty_level if difficulty else 'UNKNOWN'
 
         lesson_rows.append({
             'lesson_id': str(lesson.id),
@@ -948,11 +1002,32 @@ def teacher_course_analytics(request, course_id):
             'failures': failures,
             'failure_rate': failure_rate,
             'accesses': accesses,
-            'access_students_count': access_students_count,
+            'access_students_count': difficulty.unique_students if difficulty else 0,
             'difficulty_level': difficulty_level,
             'difficulty_label': difficulty_display_label(difficulty_level),
             'student_access_breakdown': student_access_breakdown,
         })
+
+    # Get attendance data for the course
+    session_date = timezone.now().date()
+    attendance_records = AttendanceRecord.objects.filter(
+        course=course,
+        session_date=session_date
+    ).select_related('student')
+
+    present_count = attendance_records.filter(status=AttendanceRecord.Status.PRESENT).count()
+    late_count = attendance_records.filter(status=AttendanceRecord.Status.LATE).count()
+    total_students = enrollments.count()
+    attendance_rate = ((present_count + late_count) / total_students * 100) if total_students > 0 else 0
+
+    # Get recent attendance history (last 30 days)
+    recent_attendance = AttendanceRecord.objects.filter(
+        course=course,
+        session_date__gte=timezone.now().date() - timedelta(days=30)
+    ).select_related('student').order_by('-session_date', '-recorded_at')[:20]
+
+    # Get students for attendance form
+    students = [e.student for e in enrollments.select_related('student')]
 
     context = {
         'teacher_name': request.user.display_name,
@@ -960,6 +1035,14 @@ def teacher_course_analytics(request, course_id):
         'risk_summary': risk_summary,
         'enrollments': enrollments[:50],
         'lesson_rows': lesson_rows,
+        # Attendance data
+        'session_date': session_date,
+        'present_count': present_count,
+        'late_count': late_count,
+        'total_students': total_students,
+        'attendance_rate': attendance_rate,
+        'attendance_records': recent_attendance,
+        'students': students,
     }
     return render(request, 'dashboard/teacher/course_analytics.html', context)
 
@@ -1218,14 +1301,22 @@ def student_course_quizzes(request, course_id):
 
     # Get lessons with completion status
     lessons = Lesson.objects.filter(
-        module__course=course,
-        is_published=True
+        module__course=course
     ).select_related('module').order_by('module__order', 'order')
 
     lesson_completions = LessonCompletion.objects.filter(
         student=request.user,
         lesson__module__course=course
     ).values_list('lesson_id', flat=True)
+
+    # Get lessons that have been viewed (have interaction records)
+    viewed_lesson_ids = set(
+        LessonInteraction.objects.filter(
+            student=request.user,
+            lesson__module__course=course,
+            interaction_type=LessonInteraction.InteractionType.VIEW
+        ).values_list('lesson_id', flat=True)
+    )
 
     quizzes_by_lesson = {
         quiz.lesson_id: quiz
@@ -1236,11 +1327,36 @@ def student_course_quizzes(request, course_id):
     for lesson in lessons:
         completed = lesson.id in lesson_completions
         quiz = quizzes_by_lesson.get(lesson.id)
+        # A quiz is "imported/recorded" if it's EXTERNAL type OR has no questions
+        is_imported = bool(quiz and (quiz.quiz_type == 'EXTERNAL' or int(quiz.total_questions or 0) == 0))
+        # A quiz is "online/takable" only if it has questions and is published
+        quiz_available = bool(quiz and quiz.is_published and int(quiz.total_questions or 0) > 0)
+        
+        # Get attempt info for quizzes
+        attempt_info = None
+        if quiz:
+            attempt = QuizAttempt.objects.filter(
+                student=request.user,
+                quiz=quiz,
+                status__in=[QuizAttempt.Status.COMPLETED, QuizAttempt.Status.TIMED_OUT]
+            ).select_related('quiz').order_by('-submitted_at').first()
+            if attempt:
+                attempt_info = {
+                    'score_percentage': float(attempt.score_percentage or 0),
+                    'passed': attempt.passed,
+                    'submitted_at': attempt.submitted_at,
+                    'passing_score': float(quiz.passing_score or 70),
+                }
+        
         lesson_rows.append({
             'lesson': lesson,
             'completed': completed,
+            'viewed': lesson.id in viewed_lesson_ids and not completed,
             'quiz_id': str(quiz.id) if quiz else '',
-            'quiz_available': bool(quiz and quiz.is_published and int(quiz.total_questions or 0) > 0),
+            'quiz_available': quiz_available,
+            'is_imported': is_imported,
+            'has_attempt': bool(attempt_info),
+            'attempt_info': attempt_info,
         })
 
     attempted_quiz_ids = QuizAttempt.objects.filter(
@@ -1303,6 +1419,10 @@ def student_course_quizzes(request, course_id):
         'enrollment': enrollment,
         'lesson_rows': lesson_rows,
         'quiz_rows': quiz_rows,
+        'all_enrollments': Enrollment.objects.filter(
+            student=request.user,
+            status=Enrollment.Status.ACTIVE
+        ).select_related('course').order_by('course__title'),
         'draft_quiz_count': Quiz.objects.filter(
             lesson__module__course=course,
             is_published=False,
@@ -1379,12 +1499,22 @@ def student_quiz_attempts(request, quiz_id):
 
             try:
                 attempt.complete(responses)
+                
+                # Auto-mark lesson as complete if quiz was passed
+                if attempt.passed:
+                    LessonCompletion.objects.get_or_create(
+                        student=request.user,
+                        lesson=quiz.lesson,
+                        defaults={'completed_at': timezone.now()}
+                    )
+                    enrollment.update_progress()
+                
                 enrollment.update_last_activity()
                 RiskEngine.calculate_student_risk(str(enrollment.id))
                 AlertGenerator.check_and_generate_alerts(enrollment_id=str(enrollment.id))
                 messages.success(
                     request,
-                    f'Quiz submitted. You scored {float(attempt.score_percentage or 0):.2f}%.'
+                    f'Quiz submitted. You scored {float(attempt.score_percentage or 0):.2f}%.{" Lesson marked complete!" if attempt.passed else ""}'
                 )
             except ValueError as exc:
                 messages.error(request, str(exc))
@@ -1433,7 +1563,9 @@ def student_quiz_attempts(request, quiz_id):
         'quiz': quiz,
         'attempt_rows': attempt_rows,
         'attempts_allowed': attempts_allowed,
+        'attempts_used': attempts_used,
         'attempts_left': attempts_left,
+        'best_attempt': best_attempt,
         'final_grade': final_grade,
         'final_percentage': round(final_percentage, 2),
         'question_rows': question_rows,
@@ -1536,36 +1668,48 @@ def student_quiz_review(request, attempt_id):
 def _build_risk_explainability(enrollment: Enrollment) -> Dict[str, Any]:
     """
     Build transparent risk-factor breakdown using the same weights as RiskEngine.
+    Shows actual deficit percentages and weighted contributions.
     """
     progress_pct = float(enrollment.progress_percentage or 0)
     quiz_pct = float(enrollment.average_quiz_score or 0)
     days_inactive = max(0, int(enrollment.days_since_last_activity or 0))
 
-    progress_risk = max(0.0, min(1.0, 1.0 - (progress_pct / 100.0)))
-    quiz_risk = max(0.0, min(1.0, 1.0 - (quiz_pct / 100.0)))
+    # Calculate deficits (what's missing from 100%)
+    progress_deficit = 100.0 - progress_pct
+    quiz_deficit = 100.0 - quiz_pct
+    
+    # Risk components (normalized 0-1)
+    progress_risk = max(0.0, min(1.0, progress_deficit / 100.0))
+    quiz_risk = max(0.0, min(1.0, quiz_deficit / 100.0))
     inactivity_risk = max(0.0, min(1.0, days_inactive / 14.0))
+
+    # Calculate weighted contributions (these should sum to the total risk score)
+    # Formula: Risk = 0.4 * progress_deficit + 0.4 * quiz_deficit + 0.2 * inactivity
+    progress_contribution = progress_risk * 0.4 * 100.0  # Convert to percentage points
+    quiz_contribution = quiz_risk * 0.4 * 100.0
+    inactivity_contribution = inactivity_risk * 0.2 * 100.0
 
     factors = [
         {
             'name': 'Progress Deficit',
             'weight': 0.40,
-            'value_display': f"{progress_pct:.1f}%",
+            'value_display': f"{progress_deficit:.1f}%",  # Show deficit, not progress
             'risk_component': progress_risk,
-            'contribution_pct': progress_risk * 40.0,
+            'contribution_pct': progress_contribution,
         },
         {
             'name': 'Quiz Performance Deficit',
             'weight': 0.40,
-            'value_display': f"{quiz_pct:.1f}%",
+            'value_display': f"{quiz_deficit:.1f}%",  # Show deficit, not score
             'risk_component': quiz_risk,
-            'contribution_pct': quiz_risk * 40.0,
+            'contribution_pct': quiz_contribution,
         },
         {
             'name': 'Inactivity',
             'weight': 0.20,
             'value_display': f"{days_inactive} days",
             'risk_component': inactivity_risk,
-            'contribution_pct': inactivity_risk * 20.0,
+            'contribution_pct': inactivity_contribution,
         },
     ]
     primary = max(factors, key=lambda item: item['contribution_pct'])
@@ -1789,6 +1933,7 @@ def teacher_students(request):
     return render(request, 'dashboard/teacher/students.html', context)
 
 
+@ensure_csrf_cookie
 def student_enroll_by_key(request):
     """Allow a student to enroll in a published course using enrollment key."""
     if not request.user.is_authenticated:
@@ -1807,11 +1952,10 @@ def student_enroll_by_key(request):
         return redirect(next_url)
 
     course = Course.objects.filter(
-        enrollment_key=key,
-        status=Course.Status.PUBLISHED
+        enrollment_key=key
     ).first()
     if not course:
-        messages.error(request, 'Invalid key or course is not currently open for enrollment.')
+        messages.error(request, 'Invalid enrollment key.')
         return redirect(next_url)
 
     enrollment = Enrollment.objects.filter(student=request.user, course=course).first()
@@ -2047,9 +2191,15 @@ class TeacherDashboardAPI(APIView):
     def get(self, request, format=None):
         """Get all dashboard data in one request"""
         teacher = request.user
+        
+        # Get optional course_id filter
+        course_id = request.query_params.get('course_id')
+        selected_course = None
+        if course_id:
+            selected_course = Course.objects.filter(id=course_id, teacher=teacher).first()
 
         # Recompute risk and alerts to avoid stale UB: ensure dashboard summary is consistent.
-        AlertGenerator.check_and_generate_alerts(recalculate_risk=True, course_id=None)
+        AlertGenerator.check_and_generate_alerts(recalculate_risk=True, course_id=course_id)
 
         # Keep unresolved alerts aligned with latest enrollment risk state.
         AlertGenerator._resolve_old_alerts()
@@ -2058,6 +2208,8 @@ class TeacherDashboardAPI(APIView):
         if request.query_params.get('export') == 'csv':
             # Export all active enrollments for the teacher's courses.
             courses = Course.objects.filter(teacher=teacher, status='PUBLISHED')
+            if selected_course:
+                courses = courses.filter(id=selected_course.id)
             course_ids = courses.values_list('id', flat=True)
             enrollments = Enrollment.objects.filter(course_id__in=course_ids, status='ACTIVE').select_related('student', 'course')
 
@@ -2097,18 +2249,29 @@ class TeacherDashboardAPI(APIView):
 
             return response
         
-        # Get teacher's courses
-        courses = Course.objects.filter(teacher=teacher, status='PUBLISHED')
-        course_ids = courses.values_list('id', flat=True)
+        # Get teacher's courses (include all courses, not just published)
+        if selected_course:
+            # When filtering by specific course, include it regardless of status
+            courses = Course.objects.filter(id=selected_course.id)
+            course_ids = [selected_course.id]
+        else:
+            # Include ALL courses with this teacher, not just published
+            courses = Course.objects.filter(teacher=teacher)
+            course_ids = courses.values_list('id', flat=True)
         
-        # Get active enrollments
+        # Get active enrollments (filtered by course if specified)
         enrollments = Enrollment.objects.filter(
             course_id__in=course_ids,
             status='ACTIVE'
         ).select_related('student', 'course')
         
-        # Calculate KPIs
+        # Refresh lesson difficulty snapshots so labels and failure rates stay in sync.
+        for course in courses:
+            DifficultyAnalyzer.analyze_course_difficulties(str(course.id))
+        
+        # Calculate KPIs with unique student count
         total_students = enrollments.count()
+        total_unique_students = enrollments.values('student_id').distinct().count()
         high_risk_count = enrollments.filter(risk_level__in=['HIGH', 'CRITICAL']).count()
         medium_risk_count = enrollments.filter(risk_level='MEDIUM').count()
         low_risk_count = enrollments.filter(risk_level='LOW').count()
@@ -2170,13 +2333,21 @@ class TeacherDashboardAPI(APIView):
             status__in=['ACTIVE', 'ACKNOWLEDGED'],
             alert_type__in=RISK_ALERT_TYPES
         )
+        if selected_course:
+            unresolved_alerts = unresolved_alerts.filter(course=selected_course)
         active_alerts_count = unresolved_alerts.count()
         recent_alerts = unresolved_alerts.select_related('student', 'course').order_by('-generated_at')[:10]
         
-        # Risk distribution by course
+        # Risk distribution by course (show all courses even when filtered for context)
         course_risk = []
-        for course in courses[:5]:  # Top 5 courses
-            course_enrollments = enrollments.filter(course=course)
+        # Include selected course even if not published, plus all published courses
+        if selected_course:
+            courses_to_show = [selected_course]
+        else:
+            courses_to_show = list(Course.objects.filter(teacher=teacher, status='PUBLISHED')[:5])
+        
+        for course in courses_to_show:
+            course_enrollments = Enrollment.objects.filter(course=course, status='ACTIVE')
             if course_enrollments.exists():
                 course_risk.append({
                     'course_id': str(course.id),
@@ -2189,10 +2360,13 @@ class TeacherDashboardAPI(APIView):
                     'low_risk': course_enrollments.filter(risk_level='LOW').count(),
                 })
         
-        # Hardest topics
-        hardest_topics = LessonDifficulty.objects.filter(
+        # Hardest topics (filtered by course if specified)
+        hardest_topics_query = LessonDifficulty.objects.filter(
             lesson__module__course__teacher=teacher
-        ).select_related('lesson__module__course').order_by('-difficulty_score')[:10]
+        )
+        if selected_course:
+            hardest_topics_query = hardest_topics_query.filter(lesson__module__course=selected_course)
+        hardest_topics = hardest_topics_query.select_related('lesson__module__course').order_by('-difficulty_score')[:10]
         
         # Format alert data
         alerts_data = []
@@ -2226,19 +2400,31 @@ class TeacherDashboardAPI(APIView):
                 'signal': signal,
             })
         
+        # Build courses list for selector
+        all_courses = Course.objects.filter(teacher=teacher).order_by('title')
+        all_courses_list = []
+        for c in all_courses:
+            all_courses_list.append({
+                'id': str(c.id),
+                'title': c.title,
+            })
+        
         return Response({
             'kpi': {
                 'total_students': total_students,
+                'total_unique_students': total_unique_students,
                 'high_risk_count': high_risk_count,
                 'medium_risk_count': medium_risk_count,
                 'low_risk_count': low_risk_count,
                 'avg_performance': round(avg_performance, 1),
                 'active_alerts': active_alerts_count,
+                'students_with_alerts': len(set(a.student_id for a in recent_alerts)),
             },
             'risk_distribution': {
-                'labels': ['Low Risk', 'Medium Risk', 'High Risk'],
-                'data': [low_risk_count, medium_risk_count, high_risk_count],
-                'colors': ['#10b981', '#f59e0b', '#ef4444'],
+                'labels': ['Low Risk', 'Medium Risk', 'High Risk', 'Critical'],
+                'data': [low_risk_count, medium_risk_count, high_risk_count,
+                        enrollments.filter(risk_level='CRITICAL').count()],
+                'colors': ['#10b981', '#f59e0b', '#ef4444', '#7f1d1d'],
             },
             'score_distribution': {
                 'labels': list(score_bands.keys()),
@@ -2254,6 +2440,8 @@ class TeacherDashboardAPI(APIView):
             'recent_alerts': alerts_data,
             'hardest_topics': topics_data,
             'focus_students': focus_students,
+            'courses': all_courses_list,
+            'selected_course_id': str(selected_course.id) if selected_course else None,
         })
 
     
@@ -2329,6 +2517,21 @@ class StudentDashboardAPI(APIView):
             if expected_progress is not None:
                 progress_gap = round(expected_progress - float(enrollment.progress_percentage or 0), 1)
 
+            # Get pending quizzes (unattempted published quizzes) with details
+            pending_quizzes = []
+            attempted_quiz_ids_set = set(attempted_quiz_ids)
+            for quiz in Quiz.objects.filter(
+                lesson__module__course=enrollment.course,
+                is_published=True,
+            ).exclude(id__in=attempted_quiz_ids_set).select_related('lesson', 'lesson__module').order_by('lesson__module__order', 'lesson__order'):
+                pending_quizzes.append({
+                    'quiz_id': str(quiz.id),
+                    'quiz_title': quiz.title,
+                    'lesson_title': quiz.lesson.title,
+                    'module_title': quiz.lesson.module.title,
+                    'attempt_url': reverse('student_course_quizzes', kwargs={'course_id': enrollment.course.id}),
+                })
+
             courses_data.append({
                 'enrollment_id': str(enrollment.id),
                 'course_id': str(enrollment.course.id),
@@ -2347,7 +2550,8 @@ class StudentDashboardAPI(APIView):
                 'expected_progress': expected_progress,
                 'progress_gap': progress_gap,
                 'days_inactive': int(enrollment.days_since_last_activity or 0),
-                'pending_assessments_count': max(0, len(published_quiz_ids) - len(attempted_quiz_ids)),
+                'pending_assessments_count': len(pending_quizzes),
+                'pending_assessments': pending_quizzes[:5],  # Include first 5 pending quizzes
                 'failed_attempts_count': failed_attempts_count,
                 'recent_quiz_scores': [
                     {
@@ -2433,11 +2637,33 @@ class StudentDashboardAPI(APIView):
             ).values('quiz_id').annotate(best_score=Max('score_percentage'))
         } if recent_attempts else {}
 
-        recent_attempt_cards = []
-        for attempt in recent_attempts[:8]:
+        # Deduplicate recent attempts - only show the most recent attempt per quiz
+        seen_quizzes = set()
+        unique_recent_attempts = []
+        for attempt in recent_attempts:
             quiz_id = str(attempt.quiz.id)
+            if quiz_id not in seen_quizzes:
+                seen_quizzes.add(quiz_id)
+                unique_recent_attempts.append(attempt)
+
+        recent_attempt_cards = []
+        for attempt in unique_recent_attempts[:8]:
+            quiz_id = str(attempt.quiz.id)
+            # Get attempt count for this quiz
+            quiz_attempt_count = QuizAttempt.objects.filter(
+                student=student,
+                quiz=attempt.quiz,
+                status__in=[QuizAttempt.Status.COMPLETED, QuizAttempt.Status.TIMED_OUT]
+            ).count()
+            # Determine if this is an imported/physical score vs online quiz
+            is_imported = (attempt.quiz.quiz_type == 'EXTERNAL' or int(attempt.quiz.total_questions or 0) == 0)
+            has_online_quiz = (attempt.quiz.is_published and int(attempt.quiz.total_questions or 0) > 0)
             recent_attempt_cards.append({
                 'quiz_id': quiz_id,
+                'course_id': str(attempt.quiz.lesson.module.course.id),
+                'lesson_id': str(attempt.quiz.lesson.id),
+                'lesson_title': attempt.quiz.lesson.title,
+                'lesson_url': reverse('open_lesson_material', kwargs={'lesson_id': attempt.quiz.lesson.id}),
                 'quiz_title': attempt.quiz.title,
                 'course_title': attempt.quiz.lesson.module.course.title,
                 'score': round(self._normalize_percentage(float(attempt.score_percentage or 0)), 2),
@@ -2445,6 +2671,12 @@ class StudentDashboardAPI(APIView):
                 'passed': bool(attempt.passed),
                 'status': attempt.status,
                 'date': attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+                'passing_score': attempt.quiz.passing_score or 70,
+                'max_attempts': attempt.quiz.max_attempts or 1,
+                'attempts_used': quiz_attempt_count,
+                'attempts_left': max(0, (attempt.quiz.max_attempts or 1) - quiz_attempt_count),
+                'is_imported': is_imported,
+                'has_online_quiz': has_online_quiz,
             })
 
         encouragement = self._get_encouragement_message(total_progress)
@@ -2495,8 +2727,8 @@ class StudentDashboardAPI(APIView):
                 f"Risk is {focus_course.get('risk_level', 'UNKNOWN')} ({round(float(focus_course.get('risk_score') or 0) * 100.0, 1)}%).",
                 f"Main issue: {str(primary_factor).lower()}.",
             ]
-            if pending_assessments > 0:
-                summary_bits.append(f"{pending_assessments} assessment{'s' if pending_assessments != 1 else ''} still need attention.")
+            if pending_assessments_total > 0:
+                summary_bits.append(f"{pending_assessments_total} assessment{'s' if pending_assessments_total != 1 else ''} still need attention.")
             if days_inactive_count > 0:
                 summary_bits.append(f"Last activity was {days_inactive_count} day{'s' if days_inactive_count != 1 else ''} ago.")
 
@@ -2622,7 +2854,12 @@ class StudentDashboardAPI(APIView):
         return None
 
     def _normalize_percentage(self, score: float) -> float:
-        normalized_score = score * 100 if score <= 1 else score
+        """Normalize percentage values to 0-100 range"""
+        if score is None:
+            return 0.0
+        # If score is stored as decimal (0-1), convert to percentage (0-100)
+        # If score is already a percentage (>1), keep as-is but cap at 100
+        normalized_score = score * 100 if score <= 1.0 else score
         return max(0.0, min(100.0, normalized_score))
 
     def _engagement_level(self, score: float) -> str:
@@ -3113,10 +3350,433 @@ class DifficultyAnalysisView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = 'Topic Difficulty Analysis'
+        # Include ALL teacher courses, not just published
         context['courses'] = Course.objects.filter(
-            teacher=self.request.user,
-            status=Course.Status.PUBLISHED
-        )
+            teacher=self.request.user
+        ).order_by('title')
+        return context
+
+
+class HelpSupportView(LoginRequiredMixin, TemplateView):
+    """
+    Template view for Help & Support page
+    Provides FAQ, tutorials, and contact information for students
+    """
+    template_name = 'dashboard/help_support.html'
+    login_url = 'login'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = 'Help & Support'
+        
+        # FAQ data
+        context['faqs'] = [
+            {
+                'question': 'How do I join a course?',
+                'answer': 'You can join a course by clicking on "Join Course by Key" in the sidebar, then entering the enrollment key provided by your teacher. Alternatively, your teacher may enroll you directly.'
+            },
+            {
+                'question': 'What is my risk score?',
+                'answer': 'Your risk score is calculated based on three main factors: quiz performance, course progress, and engagement. Lower scores (0-40%) indicate low risk, medium (40-70%) indicates some concerns, and high (70-100%) means you may need additional support.'
+            },
+            {
+                'question': 'How can I improve my risk score?',
+                'answer': 'To lower your risk score: 1) Complete pending quizzes and assessments, 2) Keep up with lesson progress, 3) Log in regularly to maintain engagement, 4) Review failed quiz attempts to understand mistakes.'
+            },
+            {
+                'question': 'What are pending assessments?',
+                'answer': 'Pending assessments are quizzes you haven\'t attempted yet. They appear in your "Pending Assessments" section and should be completed to improve your course standing.'
+            },
+            {
+                'question': 'How do I report difficulty with a lesson?',
+                'answer': 'When viewing a course, click the "Report Difficulty" button next to any lesson. Describe what you\'re struggling with, and your teacher will be notified to provide support.'
+            },
+            {
+                'question': 'Why can\'t I see my risk history?',
+                'answer': 'Risk history tracking begins after you\'ve completed at least one quiz and have some course activity. The more you engage with your courses, the more complete your risk history will be.'
+            },
+        ]
+        
+        # Tutorial/quick tips
+        context['tutorials'] = [
+            {
+                'title': 'Getting Started',
+                'description': 'Learn the basics of navigating your student dashboard',
+                'icon': 'fa-rocket'
+            },
+            {
+                'title': 'Understanding Risk Scores',
+                'description': 'How risk scores are calculated and what they mean',
+                'icon': 'fa-shield-heart'
+            },
+            {
+                'title': 'Taking Quizzes',
+                'description': 'Best practices for completing assessments',
+                'icon': 'fa-file-pen'
+            },
+            {
+                'title': 'Tracking Progress',
+                'description': 'Using the dashboard to monitor your learning',
+                'icon': 'fa-chart-line'
+            },
+        ]
+        
+        return context
+
+
+class PendingAssessmentsView(LoginRequiredMixin, TemplateView):
+    """
+    Template view for Pending Assessments page
+    Shows only incomplete/failed quizzes that need student attention
+    Distinguishes between online quizzes (takeable) and imported assessments (recorded)
+    """
+    template_name = 'dashboard/student/pending_assessments.html'
+    login_url = 'login'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = 'Pending Assessments'
+        student = self.request.user
+        
+        # Get course filter from query params
+        selected_course_id = self.request.GET.get('course', 'all')
+        
+        # Get all active enrollments with course data
+        enrollments = Enrollment.objects.filter(
+            student=student,
+            status='ACTIVE'
+        ).select_related('course').order_by('course__title')
+        
+        # Filter to single course if selected
+        if selected_course_id and selected_course_id != 'all':
+            enrollments = enrollments.filter(course_id=selected_course_id)
+        
+        # Collect pending quizzes from all courses
+        pending_assessments = []
+        total_pending = 0
+        
+        for enrollment in enrollments:
+            # Get published quizzes for this course
+            published_quizzes = Quiz.objects.filter(
+                lesson__module__course=enrollment.course,
+                is_published=True
+            ).select_related('lesson', 'lesson__module')
+            
+            for quiz in published_quizzes:
+                # Check if quiz is imported/external (no online questions)
+                is_imported = (quiz.quiz_type == Quiz.QuizType.EXTERNAL or 
+                               quiz.total_questions == 0)
+                
+                # Get ALL attempts for this quiz by this student (including abandoned)
+                all_attempts = QuizAttempt.objects.filter(
+                    student=student,
+                    quiz=quiz
+                ).order_by('-submitted_at', '-started_at')
+                
+                # Count only completed/timed out attempts for limit calculation
+                completed_attempts = all_attempts.filter(
+                    status__in=[QuizAttempt.Status.COMPLETED, QuizAttempt.Status.TIMED_OUT]
+                )
+                attempt_count = completed_attempts.count()
+                best_attempt = completed_attempts.first()
+                
+                # Check if there's an in-progress attempt
+                in_progress = all_attempts.filter(
+                    status=QuizAttempt.Status.IN_PROGRESS
+                ).first()
+                
+                # Determine if quiz needs attention
+                needs_attention = False
+                status_label = ""
+                action_type = ""
+                button_label = ""
+                
+                if is_imported:
+                    # For imported assessments - treat like online quizzes for attempt logic
+                    if best_attempt and best_attempt.passed:
+                        # Already passed - don't show in pending
+                        continue
+                    elif in_progress:
+                        # Has in-progress attempt (can happen if teacher started recording)
+                        needs_attention = True
+                        status_label = "Recording in progress"
+                        action_type = "continue"
+                        button_label = "Continue"
+                    elif attempt_count >= quiz.max_attempts:
+                        # Exhausted attempts but didn't pass
+                        needs_attention = True
+                        remaining = max(0, quiz.max_attempts - attempt_count)
+                        status_label = f"Attempts exhausted ({attempt_count}/{quiz.max_attempts})"
+                        action_type = "view_results"
+                        button_label = "View Results"
+                    elif attempt_count > 0:
+                        # Has recorded attempt but not passed, can retake
+                        remaining = max(0, quiz.max_attempts - attempt_count)
+                        needs_attention = True
+                        status_label = f"Recorded: {float(best_attempt.score_percentage):.0f}% - {remaining} retake(s) left"
+                        action_type = "retake"
+                        button_label = "Retake Quiz"
+                    else:
+                        # No attempt recorded yet
+                        needs_attention = True
+                        status_label = f"Score not yet recorded - {quiz.max_attempts} attempts allowed"
+                        action_type = "waiting"
+                        button_label = "Waiting for Teacher"
+                else:
+                    # For online quizzes
+                    if best_attempt and best_attempt.passed:
+                        # Already passed - don't show in pending
+                        continue
+                    elif in_progress:
+                        # Has in-progress attempt
+                        needs_attention = True
+                        status_label = "In progress - continue your attempt"
+                        action_type = "continue"
+                        button_label = "Continue Quiz"
+                    elif attempt_count >= quiz.max_attempts:
+                        # Exhausted attempts but didn't pass
+                        needs_attention = True
+                        status_label = f"Attempts exhausted ({attempt_count}/{quiz.max_attempts})"
+                        action_type = "view_results"
+                        button_label = "View Results"
+                    elif attempt_count > 0:
+                        # Has failed attempts, can retake
+                        remaining = max(0, quiz.max_attempts - attempt_count)
+                        needs_attention = True
+                        status_label = f"Failed - {remaining} attempt(s) remaining"
+                        action_type = "retake"
+                        button_label = "Retake Quiz"
+                    else:
+                        # Never attempted
+                        needs_attention = True
+                        status_label = f"Not started - {quiz.max_attempts} attempts allowed"
+                        action_type = "start"
+                        button_label = "Start Quiz"
+                
+                if needs_attention:
+                    total_pending += 1
+                    
+                    # Calculate remaining attempts correctly
+                    remaining_attempts = max(0, quiz.max_attempts - attempt_count)
+                    
+                    # Build direct URL to quiz attempts page
+                    attempts_url = reverse('student_quiz_attempts', kwargs={'quiz_id': quiz.id})
+                    
+                    # Build attempt history for this quiz
+                    attempt_history = []
+                    for attempt in completed_attempts[:5]:  # Last 5 attempts
+                        attempt_history.append({
+                            'attempt_number': attempt.attempt_number,
+                            'score_percentage': float(attempt.score_percentage or 0),
+                            'passed': attempt.passed,
+                            'submitted_at': attempt.submitted_at,
+                            'time_spent_seconds': attempt.time_spent_seconds,
+                        })
+                    
+                    pending_assessments.append({
+                        'quiz_id': str(quiz.id),
+                        'quiz_title': quiz.title,
+                        'lesson_title': quiz.lesson.title,
+                        'module_title': quiz.lesson.module.title,
+                        'course_id': str(enrollment.course.id),
+                        'course_title': enrollment.course.title,
+                        'attempts_url': attempts_url,
+                        'time_limit': quiz.time_limit_minutes or 0,
+                        'passing_score': quiz.passing_score,
+                        'max_attempts': quiz.max_attempts,
+                        'attempts_used': attempt_count,
+                        'attempts_left': remaining_attempts,
+                        'is_imported': is_imported,
+                        'has_questions': quiz.total_questions > 0,
+                        'status_label': status_label,
+                        'action_type': action_type,
+                        'button_label': button_label,
+                        # Only show best score if there are attempts
+                        'best_score': float(best_attempt.score_percentage) if best_attempt else None,
+                        'has_attempts': attempt_count > 0,
+                        'attempt_history': attempt_history,  # For inline display
+                    })
+        
+        # Sort by course and module order
+        pending_assessments.sort(key=lambda x: (x['course_title'], x['module_title'], x['lesson_title']))
+        
+        # Group by course for template
+        course_groups = {}
+        for assessment in pending_assessments:
+            course_id = assessment['course_id']
+            if course_id not in course_groups:
+                course_groups[course_id] = {
+                    'course_id': course_id,
+                    'course_title': assessment['course_title'],
+                    'assessments': [],
+                    'online_count': 0,
+                    'imported_count': 0,
+                }
+            course_groups[course_id]['assessments'].append(assessment)
+            if assessment['is_imported']:
+                course_groups[course_id]['imported_count'] += 1
+            else:
+                course_groups[course_id]['online_count'] += 1
+        
+        context['pending_assessments'] = pending_assessments
+        context['course_groups'] = course_groups
+        context['total_pending'] = total_pending
+        context['total_online'] = sum(1 for a in pending_assessments if not a['is_imported'])
+        context['total_imported'] = sum(1 for a in pending_assessments if a['is_imported'])
+        context['enrollments'] = enrollments
+        context['all_enrollments'] = Enrollment.objects.filter(
+            student=student, status='ACTIVE'
+        ).select_related('course').order_by('course__title')
+        context['selected_course'] = selected_course_id
+        context['breadcrumbs'] = [
+            {'title': 'My Courses', 'url': reverse('dashboard_courses')},
+            {'title': 'Pending Assessments', 'url': None},
+        ]
+        
+        return context
+
+
+class RiskHistoryView(LoginRequiredMixin, TemplateView):
+    """
+    Template view for Risk History page
+    Shows detailed timeline of risk scores over time
+    """
+    template_name = 'dashboard/student/risk_history.html'
+    login_url = 'login'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = 'Risk History'
+        student = self.request.user
+        
+        # Get all active enrollments
+        enrollments = Enrollment.objects.filter(
+            student=student,
+            status='ACTIVE'
+        ).select_related('course')
+        
+        # Build risk history data for each course
+        courses_risk_data = []
+        all_risk_history = []
+        
+        for enrollment in enrollments:
+            # Current risk data - convert to percentage for display
+            risk_data = {
+                'course_id': str(enrollment.course.id),
+                'course_title': enrollment.course.title,
+                'current_risk_score': float(enrollment.risk_score or 0) * 100.0,  # Convert to percentage
+                'current_risk_level': enrollment.risk_level or 'UNKNOWN',
+                'progress': float(enrollment.progress_percentage or 0),
+                'avg_score': float(enrollment.average_quiz_score or 0),
+                'engagement_score': float(enrollment.engagement_score or 0) * 100.0,  # Convert to percentage
+                'days_inactive': int(enrollment.days_since_last_activity or 0),
+            }
+            courses_risk_data.append(risk_data)
+            
+            # Get risk history for this enrollment
+            enrollment_history = RiskHistory.objects.filter(
+                enrollment=enrollment
+            ).order_by('-calculated_at')[:20]
+            
+            # Convert to dictionaries with percentage-scaled risk_score for display
+            for entry in enrollment_history:
+                all_risk_history.append({
+                    'id': entry.id,
+                    'risk_score': float(entry.risk_score or 0) * 100.0,  # Convert decimal to percentage
+                    'risk_level': entry.risk_level,
+                    'calculated_at': entry.calculated_at,
+                    'contributing_factors': entry.contributing_factors,
+                    'course_title': enrollment.course.title,
+                })
+        
+        # Sort all history by date (most recent first) and deduplicate
+        all_risk_history.sort(key=lambda x: x['calculated_at'], reverse=True)
+        
+        context['courses_risk_data'] = courses_risk_data
+        context['enrollments'] = enrollments
+        context['overall_risk'] = self._calculate_overall_risk(courses_risk_data)
+        context['risk_history'] = all_risk_history[:30]  # Limit to 30 most recent entries
+        
+        return context
+    
+    def _calculate_overall_risk(self, courses_data):
+        """Calculate overall risk across all courses"""
+        if not courses_data:
+            return {'level': 'UNKNOWN', 'score': 0}
+        
+        avg_score = sum(c['current_risk_score'] for c in courses_data) / len(courses_data)
+        
+        # Determine overall level
+        if avg_score >= 70:
+            level = 'HIGH'
+        elif avg_score >= 40:
+            level = 'MEDIUM'
+        else:
+            level = 'LOW'
+        
+        return {
+            'level': level,
+            'score': round(avg_score, 1)
+        }
+
+
+class DeadlinesView(LoginRequiredMixin, TemplateView):
+    """
+    Template view for Deadlines page
+    Shows upcoming quiz deadlines and course targets in a calendar/list view
+    """
+    template_name = 'dashboard/student/deadlines.html'
+    login_url = 'login'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = 'Deadlines & Schedule'
+        student = self.request.user
+        
+        # Get active enrollments with course deadlines
+        enrollments = Enrollment.objects.filter(
+            student=student,
+            status='ACTIVE'
+        ).select_related('course')
+        
+        deadlines = []
+        for enrollment in enrollments:
+            progress = float(enrollment.progress_percentage or 0)
+            
+            # Calculate expected progress based on enrollment date
+            enrollment_date = enrollment.enrolled_at
+            if enrollment_date:
+                days_enrolled = (timezone.now() - enrollment_date).days
+                expected_progress = min(100, (days_enrolled / 30) * 10)  # Assume 30 days per 10%
+                days_behind = max(0, int((expected_progress - progress) / 10 * 7)) if expected_progress > progress else 0
+            else:
+                expected_progress = None
+                days_behind = 0
+            
+            deadline = {
+                'course_id': str(enrollment.course.id),
+                'course_title': enrollment.course.title,
+                'current_progress': progress,
+                'expected_progress': round(expected_progress, 1) if expected_progress else None,
+                'progress_gap': round(expected_progress - progress, 1) if expected_progress else None,
+                'days_behind': days_behind,
+                'days_left': max(0, 30 - days_enrolled) if enrollment_date else None,
+                'risk_level': enrollment.risk_level,
+            }
+            deadlines.append(deadline)
+        
+        # Sort by days left (most urgent first)
+        deadlines.sort(key=lambda x: x['days_left'] if x['days_left'] is not None else 999)
+        
+        context['deadlines'] = deadlines
+        context['enrollments'] = enrollments
+        context['total_courses'] = len(deadlines)
+        context['urgent_count'] = sum(1 for d in deadlines if d.get('days_left', 999) <= 7)
+        context['on_track_count'] = len(deadlines) - sum(1 for d in deadlines if d.get('days_left', 999) <= 7)
+        # Calculate average progress
+        progress_values = [d['current_progress'] for d in deadlines if d.get('current_progress')]
+        context['avg_progress'] = round(sum(progress_values) / len(progress_values), 0) if progress_values else 0
+        
         return context
 
 
@@ -3168,6 +3828,12 @@ class DifficultyAPI(APIView):
                 (float(d.unique_students or 0) / float(active_students_in_course)) * 100.0
                 if active_students_in_course > 0 else 0.0
             )
+            
+            # Calculate detailed breakdown numbers
+            total_attempts = int(d.total_attempts or 0)
+            failed_attempts = int(round(float(d.failure_rate) * total_attempts)) if total_attempts > 0 else 0
+            retaking_students = int(d.unique_students or 0)
+            
             hardest_data.append({
                 'lesson_id': str(d.lesson.id),
                 'lesson_title': d.lesson.title,
@@ -3180,6 +3846,10 @@ class DifficultyAPI(APIView):
                 'access_count': int(d.total_views or 0),
                 'access_coverage_pct': round(access_coverage_pct, 1),
                 'access_frequency': float(d.access_frequency),
+                # Detailed breakdown
+                'total_attempts': total_attempts,
+                'failed_attempts': failed_attempts,
+                'retaking_students': retaking_students,
             })
         
         return Response({
@@ -3194,6 +3864,109 @@ class DifficultyAPI(APIView):
             'hardest_lessons': hardest_data,
             'total_analyzed': difficulties.count(),
         })
+
+class LessonStudentsAPI(APIView):
+    """
+    API to get students who accessed a specific lesson.
+    Used by the difficulty analyzer "Students" button.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [permissions.IsAuthenticated, IsTeacher]
+    
+    def get(self, request, format=None):
+        """Get students who accessed a specific lesson"""
+        lesson_id = request.query_params.get('lesson_id')
+        if not lesson_id:
+            return Response(
+                {'error': 'lesson_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get the lesson and verify teacher owns the course
+        lesson = get_object_or_404(
+            Lesson.objects.select_related('module__course'),
+            id=lesson_id
+        )
+        
+        if lesson.module.course.teacher != request.user and request.user.role != 'ADMIN':
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get students who viewed the lesson
+        view_interactions = LessonInteraction.objects.filter(
+            lesson=lesson,
+            interaction_type=LessonInteraction.InteractionType.VIEW
+        ).select_related('student').values('student').annotate(
+            view_count=Count('id'),
+            last_accessed=Max('timestamp')
+        )
+        
+        # Get students who completed the lesson
+        completions = LessonCompletion.objects.filter(
+            lesson=lesson
+        ).select_related('student').values('student').annotate(
+            completion_count=Count('id'),
+            last_completed=Max('completed_at')
+        )
+        
+        # Build student access map
+        student_access_map = {}
+        
+        for interaction in view_interactions:
+            student_id = interaction['student']
+            student_access_map[student_id] = {
+                'access_count': interaction['view_count'],
+                'last_accessed': interaction['last_accessed'],
+                'completed': False,
+            }
+        
+        for completion in completions:
+            student_id = completion['student']
+            if student_id in student_access_map:
+                student_access_map[student_id]['completed'] = True
+                student_access_map[student_id]['last_accessed'] = max(
+                    student_access_map[student_id]['last_accessed'] or completion['last_completed'],
+                    completion['last_completed']
+                )
+            else:
+                student_access_map[student_id] = {
+                    'access_count': completion['completion_count'],
+                    'last_accessed': completion['last_completed'],
+                    'completed': True,
+                }
+        
+        # Get student details
+        student_ids = list(student_access_map.keys())
+        students = get_user_model().objects.filter(
+            id__in=student_ids,
+            role='STUDENT'
+        ).values('id', 'display_name', 'email', 'first_name', 'last_name')
+        
+        # Build response
+        student_list = []
+        for student in students:
+            access_info = student_access_map.get(student['id'], {})
+            student_list.append({
+                'id': str(student['id']),
+                'name': student['display_name'] or f"{student['first_name']} {student['last_name']}".strip(),
+                'email': student['email'],
+                'access_count': access_info.get('access_count', 0),
+                'completed': access_info.get('completed', False),
+                'last_accessed': access_info.get('last_accessed'),
+            })
+        
+        # Sort by access count descending
+        student_list.sort(key=lambda x: x['access_count'], reverse=True)
+        
+        return Response({
+            'lesson_id': lesson_id,
+            'lesson_title': lesson.title,
+            'students': student_list,
+            'total_students': len(student_list),
+        })
+
 
 class TeacherDashboardCachedAPI(APIView):
     """
@@ -3368,4 +4141,254 @@ class DifficultyCachedAPI(APIView):
         """Invalidate difficulty cache"""
         DifficultyCache.invalidate_difficulty_cache()
         return Response({'message': 'Difficulty cache cleared'})
+
+
+class AttendanceAPI(APIView):
+    """
+    API endpoint for managing student attendance records.
+    """
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id=None, format=None):
+        """Get attendance records for a course"""
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Get course
+        if course_id:
+            course = get_object_or_404(Course, id=course_id)
+        else:
+            course_id_param = request.query_params.get('course_id')
+            if not course_id_param:
+                return Response({'error': 'course_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            course = get_object_or_404(Course, id=course_id_param)
+
+        # Check permissions - only teacher of the course or admin
+        if request.user.role != 'ADMIN' and course.teacher != request.user:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Get students enrolled in the course
+        enrollments = Enrollment.objects.filter(
+            course=course,
+            status=Enrollment.Status.ACTIVE
+        ).select_related('student')
+
+        students = [e.student for e in enrollments]
+
+        # Get date filter (default to today)
+        session_date = request.query_params.get('date')
+        if session_date:
+            try:
+                session_date = datetime.strptime(session_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            session_date = timezone.now().date()
+
+        # Get attendance records for this date
+        attendance_records = AttendanceRecord.objects.filter(
+            course=course,
+            session_date=session_date
+        ).select_related('student')
+
+        # Calculate stats
+        present_count = attendance_records.filter(status=AttendanceRecord.Status.PRESENT).count()
+        late_count = attendance_records.filter(status=AttendanceRecord.Status.LATE).count()
+        total_students = len(students)
+        attendance_rate = ((present_count + late_count) / total_students * 100) if total_students > 0 else 0
+
+        # Get recent records (last 30 days)
+        recent_records = AttendanceRecord.objects.filter(
+            course=course,
+            session_date__gte=timezone.now().date() - timedelta(days=30)
+        ).select_related('student').order_by('-session_date', '-recorded_at')[:50]
+
+        return Response({
+            'session_date': session_date.isoformat(),
+            'total_students': total_students,
+            'present_count': present_count,
+            'late_count': late_count,
+            'absent_count': attendance_records.filter(status=AttendanceRecord.Status.ABSENT).count(),
+            'excused_count': attendance_records.filter(status=AttendanceRecord.Status.EXCUSED).count(),
+            'attendance_rate': round(attendance_rate, 1),
+            'students': [
+                {
+                    'id': str(s.id),
+                    'display_name': s.display_name,
+                    'first_name': s.first_name,
+                    'last_name': s.last_name,
+                    'email': s.email,
+                }
+                for s in students
+            ],
+            'today_records': [
+                {
+                    'id': str(r.id),
+                    'student_id': str(r.student_id),
+                    'student_name': r.student.display_name,
+                    'status': r.status,
+                    'status_display': r.get_status_display(),
+                    'notes': r.notes,
+                }
+                for r in attendance_records
+            ],
+            'recent_records': [
+                {
+                    'id': str(r.id),
+                    'student_id': str(r.student_id),
+                    'student_name': r.student.display_name,
+                    'session_date': r.session_date.isoformat(),
+                    'status': r.status,
+                    'status_display': r.get_status_display(),
+                    'notes': r.notes,
+                }
+                for r in recent_records
+            ],
+        })
+
+    def post(self, request, format=None):
+        """Log attendance for a student"""
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        course_id = request.data.get('course_id')
+        student_id = request.data.get('student_id')
+        session_date = request.data.get('session_date')
+        status_value = request.data.get('status')
+        notes = request.data.get('notes', '')
+
+        if not all([course_id, student_id, session_date, status_value]):
+            return Response(
+                {'error': 'course_id, student_id, session_date, and status are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate status
+        valid_statuses = [s.value for s in AttendanceRecord.Status]
+        if status_value not in valid_statuses:
+            return Response(
+                {'error': f'Invalid status. Must be one of: {valid_statuses}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get course and check permissions
+        course = get_object_or_404(Course, id=course_id)
+        if request.user.role != 'ADMIN' and course.teacher != request.user:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Parse date
+        try:
+            session_date = datetime.strptime(session_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get student
+        student = get_object_or_404(get_user_model(), id=student_id, role='STUDENT')
+
+        # Check enrollment
+        if not Enrollment.objects.filter(student=student, course=course, status=Enrollment.Status.ACTIVE).exists():
+            return Response({'error': 'Student is not enrolled in this course'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create or update attendance record
+        attendance_record, created = AttendanceRecord.objects.update_or_create(
+            student=student,
+            course=course,
+            session_date=session_date,
+            defaults={
+                'status': status_value,
+                'notes': notes,
+            }
+        )
+
+        return Response({
+            'message': 'Attendance recorded successfully',
+            'record': {
+                'id': str(attendance_record.id),
+                'student_name': student.display_name,
+                'session_date': attendance_record.session_date.isoformat(),
+                'status': attendance_record.status,
+                'status_display': attendance_record.get_status_display(),
+                'notes': attendance_record.notes,
+            },
+            'created': created,
+        })
+
+
+def api_attendance_log(request):
+    """
+    HTML form endpoint for attendance logging (used by attendance_tracker component).
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    course_id = request.POST.get('course_id')
+    if not course_id:
+        return JsonResponse({'error': 'course_id is required'}, status=400)
+
+    course = get_object_or_404(Course, id=course_id)
+
+    # Check permissions
+    if request.user.role != 'ADMIN' and course.teacher != request.user:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    session_date_str = request.POST.get('session_date') or timezone.now().date().isoformat()
+    try:
+        session_date = datetime.strptime(session_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date format'}, status=400)
+
+    # Process attendance for each student
+    records_created = 0
+    records_updated = 0
+
+    for key, value in request.POST.items():
+        if key.startswith('attendance_'):
+            student_id = key.replace('attendance_', '')
+            status_value = value
+
+            # Validate status
+            valid_statuses = [s.value for s in AttendanceRecord.Status]
+            if status_value not in valid_statuses:
+                continue
+
+            # Get student
+            try:
+                student = get_user_model().objects.get(id=student_id, role='STUDENT')
+            except get_user_model().DoesNotExist:
+                continue
+
+            # Check enrollment
+            if not Enrollment.objects.filter(student=student, course=course, status=Enrollment.Status.ACTIVE).exists():
+                continue
+
+            # Create or update attendance record
+            _, created = AttendanceRecord.objects.update_or_create(
+                student=student,
+                course=course,
+                session_date=session_date,
+                defaults={
+                    'status': status_value,
+                    'notes': '',
+                }
+            )
+            if created:
+                records_created += 1
+            else:
+                records_updated += 1
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'message': f'Attendance saved: {records_created} new, {records_updated} updated',
+            'records_created': records_created,
+            'records_updated': records_updated,
+        })
+
+    # Redirect back to the course analytics page
+    messages.success(request, f'Attendance saved: {records_created} new, {records_updated} updated')
+    return redirect('teacher_course_analytics', course_id=course_id)
 

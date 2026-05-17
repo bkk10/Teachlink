@@ -1,5 +1,15 @@
 {% extends "dashboard/base.html" %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'student_dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'dashboard_courses' %}">My Courses</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ course.title }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
 {% block title %}Course Content{% endblock %}
 
 {% block extra_css %}
@@ -25,146 +35,269 @@
     }
     .chip-success { background: #e9f9ef; color: #147a3f; }
     .chip-neutral { background: #eef2ff; color: #2847a3; }
+    .chip-warning { background: #fef3c7; color: #92400e; }
+    .course-select-form {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .lesson-table th {
+        background: #f8fafc;
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #64748b;
+        border-bottom: 2px solid #e2e8f0;
+        padding: 0.75rem 1rem;
+    }
+    .lesson-table td {
+        padding: 0.75rem 1rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .lesson-table tr:hover {
+        background: #f8fafc;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-3">
+    <!-- Hero Section with Course Info -->
     <section class="quiz-shell p-4 p-lg-5 mb-4">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-            <div>
+            <div class="flex-grow-1">
                 <p class="text-uppercase small fw-semibold text-primary mb-2">Course Content</p>
-                <h2 class="fw-bold mb-1">{{ course.title }}</h2>
-                <p class="text-muted mb-0">Open lessons, complete work, and take published assessments.</p>
+                <h2 class="fw-bold mb-2">{{ course.title }}</h2>
+                <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+                    <span class="text-muted"><i class="fas fa-chalkboard-teacher me-1"></i>{{ course.teacher.display_name }}</span>
+                    {% if course.start_date and course.end_date %}
+                        <span class="text-muted"><i class="fas fa-calendar-alt me-1"></i>{{ course.start_date|date:"M Y" }} - {{ course.end_date|date:"M Y" }}</span>
+                    {% endif %}
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="d-flex align-items-center gap-3" style="max-width: 400px;">
+                    <div class="flex-grow-1">
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {{ enrollment.progress_percentage|default:0 }}%"
+                                 aria-valuenow="{{ enrollment.progress_percentage|default:0 }}" 
+                                 aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                    <span class="fw-bold text-success">{{ enrollment.progress_percentage|default:0|floatformat:0 }}% complete</span>
+                </div>
             </div>
-            <a href="{% url 'dashboard_courses' %}" class="btn btn-outline-primary">
-                <i class="fas fa-arrow-left me-1"></i>Back to My Courses
-            </a>
+            <div class="d-flex gap-2">
+                <!-- Course Switcher Dropdown -->
+                <form method="get" class="course-select-form" id="courseSwitcherForm">
+                    <label class="fw-semibold text-muted small mb-0">Switch Course:</label>
+                    <select name="course_id" class="form-select" style="min-width: 200px;" onchange="switchCourse(this.value)">
+                        {% for enrollment in all_enrollments %}
+                        <option value="{{ enrollment.course.id }}" {% if enrollment.course.id == course.id %}selected{% endif %}>
+                            {{ enrollment.course.title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+                <a href="{% url 'dashboard_courses' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-1"></i>All Courses
+                </a>
+            </div>
         </div>
     </section>
 
     {% if lesson_rows %}
-    <div class="card dashboard-card mb-4">
-        <div class="card-header bg-white">
-            <h6 class="mb-0 fw-bold">Course Lessons</h6>
-        </div>
-        <div class="card-body">
-            <div class="list-group list-group-flush">
-                {% for row in lesson_rows %}
-                <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div>
-                        <strong>
-                            <a href="{% url 'open_lesson_material' row.lesson.id %}" class="text-decoration-none">{{ row.lesson.title }}</a>
-                        </strong>
-                        <br><small class="text-muted">{{ row.lesson.module.title }} - {{ row.lesson.estimated_minutes }} min</small>
-                        <div class="mt-1">
-                            {% if row.quiz_available %}
-                            <span class="badge text-bg-primary">Quiz Ready</span>
-                            {% elif row.quiz_id %}
-                            <span class="badge text-bg-secondary">Quiz Coming Soon</span>
-                            {% else %}
-                            <span class="badge text-bg-light text-dark border">No Quiz</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
+    <!-- Lessons grouped by module -->
+    <div class="modules-container">
+        {% regroup lesson_rows by lesson.module as module_groups %}
+        {% for module in module_groups %}
+        <div class="module-section mb-4">
+            <!-- Module Header (collapsible) -->
+            <div class="d-flex align-items-center gap-2 mb-3 p-2 bg-light rounded" 
+                 style="cursor: pointer;" 
+                 onclick="toggleModule('module{{ module.grouper.id }}')">
+                <i class="fas fa-chevron-down text-muted" id="icon-module{{ module.grouper.id }}"></i>
+                <span class="fw-bold text-muted">{{ module.grouper.title }}</span>
+                <span class="badge bg-white text-dark border ms-auto">{{ module.list|length }} items</span>
+            </div>
+            
+            <!-- Lessons in this module -->
+            <div id="module{{ module.grouper.id }}" {% if not forloop.first %}style="display: none;"{% endif %}>
+                {% for row in module.list %}
+                <div class="lesson-item mb-3 p-3 border rounded-3 bg-white" 
+                     data-lesson-id="{{ row.lesson.id }}"
+                     data-has-quiz="{% if row.quiz_id %}true{% else %}false{% endif %}" 
+                     data-completed="{% if row.completed %}true{% else %}false{% endif %}"
+                     data-viewed="{% if row.viewed %}true{% else %}false{% endif %}"
+                     data-is-imported="{% if row.is_imported %}true{% else %}false{% endif %}">
+                    
+                    <!-- Lesson Title (like "Topic 1") -->
+                    <div class="d-flex align-items-center gap-2 mb-2">
                         {% if row.completed %}
-                            <span class="badge bg-success"><i class="fas fa-check me-1"></i>Completed</span>
+                            <i class="fas fa-check-circle text-success fs-5"></i>
+                        {% elif row.viewed %}
+                            <i class="fas fa-play-circle text-primary fs-5"></i>
                         {% else %}
-                            <span class="badge bg-secondary">Not Started</span>
+                            <i class="far fa-circle text-muted fs-5"></i>
                         {% endif %}
-                        <a href="{% url 'open_lesson_material' row.lesson.id %}" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-play me-1"></i>Open Lesson
-                        </a>
-                        {% if not row.completed %}
-                        <button class="btn btn-sm btn-outline-success mark-lesson-complete-btn" data-lesson-id="{{ row.lesson.id }}">
-                            <i class="fas fa-check me-1"></i>Mark Complete
-                        </button>
+                        <span class="fw-bold fs-5">{{ row.lesson.title }}</span>
+                        
+                        <!-- Status Badge -->
+                        {% if row.completed %}
+                            <span class="badge bg-success ms-2">Completed</span>
+                        {% elif row.viewed %}
+                            <span class="badge bg-primary ms-2">In Progress</span>
+                        {% else %}
+                            <span class="badge bg-secondary ms-2">Not Started</span>
                         {% endif %}
-                        {% if row.quiz_available %}
-                        <a href="{% url 'student_quiz_attempts' row.quiz_id %}?take=1" class="btn btn-sm btn-primary">
-                            <i class="fas fa-pen me-1"></i>Take Quiz
-                        </a>
+                        
+                        {% if row.lesson.estimated_minutes %}
+                            <small class="text-muted ms-auto"><i class="fas fa-clock me-1"></i>{{ row.lesson.estimated_minutes }} min</small>
                         {% endif %}
-                        <button class="btn btn-sm btn-outline-warning report-difficulty-btn" data-course-id="{{ course.id }}" data-lesson-id="{{ row.lesson.id }}">
-                            <i class="fas fa-flag me-1"></i>Report Difficulty
-                        </button>
+                    </div>
+                    
+                    <!-- File/Resource Row (like "Topic 1_Introduction... PPTX") -->
+                    <div class="d-flex align-items-center gap-2 ps-4">
+                        {% if row.lesson.resource_file %}
+                            {% with file_ext=row.lesson.resource_file.name|lower %}
+                                {% if '.pptx' in file_ext or '.ppt' in file_ext %}
+                                    <i class="fas fa-file-powerpoint text-warning fs-4"></i>
+                                {% elif '.pdf' in file_ext %}
+                                    <i class="fas fa-file-pdf text-danger fs-4"></i>
+                                {% elif '.docx' in file_ext or '.doc' in file_ext %}
+                                    <i class="fas fa-file-word text-primary fs-4"></i>
+                                {% elif '.mp4' in file_ext or '.avi' in file_ext or '.mov' in file_ext or '.webm' in file_ext %}
+                                    <i class="fas fa-file-video text-info fs-4"></i>
+                                {% elif '.xlsx' in file_ext or '.xls' in file_ext or '.csv' in file_ext %}
+                                    <i class="fas fa-file-excel text-success fs-4"></i>
+                                {% else %}
+                                    <i class="fas fa-file text-secondary fs-4"></i>
+                                {% endif %}
+                                <a href="{{ row.lesson.resource_file.url }}" class="text-decoration-none text-dark" target="_blank" onclick="trackLessonView('{{ row.lesson.id }}')">
+                                    {{ row.lesson.resource_file.name|cut:"lesson_resources/"|truncatechars:50 }}
+                                </a>
+                                <span class="text-muted small ms-1">{{ file_ext|slice:"-4:"|upper }}</span>
+                            {% endwith %}
+                        {% elif row.lesson.video_url %}
+                            <i class="fab fa-youtube text-danger fs-4"></i>
+                            <a href="{{ row.lesson.video_url }}" class="text-decoration-none text-dark" target="_blank" onclick="trackLessonView('{{ row.lesson.id }}')">
+                                Watch Video
+                            </a>
+                            <span class="text-muted small ms-1">VIDEO</span>
+                        {% elif row.lesson.external_url %}
+                            <i class="fas fa-external-link-alt text-primary fs-4"></i>
+                            <a href="{{ row.lesson.external_url }}" class="text-decoration-none text-dark" target="_blank" onclick="trackLessonView('{{ row.lesson.id }}')">
+                                External Link
+                            </a>
+                            <span class="text-muted small ms-1">LINK</span>
+                        {% elif row.lesson.content_html %}
+                            <i class="fas fa-file-alt text-secondary fs-4"></i>
+                            <a href="{% url 'open_lesson_material' row.lesson.id %}" class="text-decoration-none text-dark" onclick="trackLessonView('{{ row.lesson.id }}')">
+                                Read Article
+                            </a>
+                            <span class="text-muted small ms-1">HTML</span>
+                        {% elif row.quiz_available %}
+                            <i class="fas fa-question-circle text-info fs-4"></i>
+                            <a href="{% url 'open_lesson_material' row.lesson.id %}" class="text-decoration-none text-dark" onclick="trackLessonView('{{ row.lesson.id }}')">
+                                Take Quiz
+                            </a>
+                            <span class="text-muted small ms-1">QUIZ</span>
+                        {% else %}
+                            <i class="fas fa-file text-secondary fs-4"></i>
+                            <a href="{% url 'open_lesson_material' row.lesson.id %}" class="text-decoration-none text-dark" onclick="trackLessonView('{{ row.lesson.id }}')">
+                                Open Lesson
+                            </a>
+                        {% endif %}
+                        
+                        <!-- Quiz Score Badge or Mark Complete Button (right-aligned) -->
+                        {% if row.quiz_id and row.is_imported %}
+                            {% if row.has_attempt %}
+                                <span class="badge {% if row.attempt_info.passed %}bg-success{% else %}bg-danger{% endif %} ms-auto">
+                                    {{ row.attempt_info.score_percentage|floatformat:0 }}%
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark ms-auto">Pending Score</span>
+                            {% endif %}
+                        {% elif row.quiz_available %}
+                            <a href="{% url 'student_quiz_attempts' row.quiz_id %}" class="btn btn-sm btn-primary ms-auto">
+                                <i class="fas fa-play me-1"></i>Start Quiz
+                            </a>
+                        {% elif not row.completed %}
+                            <!-- Mark Complete button for content-only lessons -->
+                            <button class="btn btn-sm btn-outline-success mark-lesson-complete-btn ms-auto" data-lesson-id="{{ row.lesson.id }}">
+                                <i class="fas fa-check me-1"></i>Mark Complete
+                            </button>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
             </div>
         </div>
+        {% endfor %}
     </div>
+    
+    <script>
+    function toggleModule(moduleId) {
+        const content = document.getElementById(moduleId);
+        const icon = document.getElementById('icon-' + moduleId);
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        } else {
+            content.style.display = 'none';
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        }
+    }
+    </script>
     {% else %}
     <div class="mb-4">
         {% include "components/empty_state.html" with icon="fa-file-lines" title="No lessons available" message="Your teacher has not published any lessons for this course yet." %}
     </div>
-    {% endif %}
-
-    {% if quiz_rows %}
-    <div class="row g-4">
-        {% for row in quiz_rows %}
-        <div class="col-12 col-xl-6">
-            <article class="quiz-card h-100 p-4">
-                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-                    <h5 class="fw-bold mb-0">{{ row.quiz.title }}</h5>
-                    {% if row.attempts_used > 0 %}
-                        <span class="quiz-chip chip-success">{{ row.status_label }}</span>
-                    {% else %}
-                        <span class="quiz-chip chip-neutral">{{ row.status_label }}</span>
-                    {% endif %}
-                </div>
-
-                <div class="text-muted small mb-3">
-                    <div><i class="fas fa-layer-group me-1"></i>{{ row.quiz.lesson.module.title }}</div>
-                    <div><i class="fas fa-book-open me-1"></i>{{ row.quiz.lesson.title }}</div>
-                </div>
-
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <div class="border rounded-3 p-2">
-                            <div class="small text-muted">Attempts</div>
-                            <div class="fw-semibold">{{ row.attempts_used }} / {{ row.quiz.max_attempts }}</div>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="border rounded-3 p-2">
-                            <div class="small text-muted">Best Score</div>
-                            <div class="fw-semibold">{{ row.final_score|floatformat:2 }}%</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted">
-                        {% if row.latest_attempt and row.latest_attempt.submitted_at %}
-                            Last attempt: {{ row.latest_attempt.submitted_at|date:"M d, Y g:i A" }}
-                        {% else %}
-                            No attempts submitted yet.
-                        {% endif %}
-                    </small>
-                    {% if row.can_take %}
-                    <a href="{% url 'student_quiz_attempts' row.quiz.id %}?take=1" class="btn btn-primary">
-                        Take Quiz
-                    </a>
-                    {% else %}
-                    <a href="{% url 'student_quiz_attempts' row.quiz.id %}" class="btn btn-outline-primary">
-                        View Attempts
-                    </a>
-                    {% endif %}
-                </div>
-            </article>
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    {% include "components/empty_state.html" with icon="fa-clipboard-list" title="No assessments published" message="Your teacher has not published any assessments for this course yet." %}
     {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+function filterLessons(filterType) {
+    const rows = document.querySelectorAll('.lesson-table tbody tr');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const hasQuiz = row.getAttribute('data-has-quiz') === 'true';
+        const completed = row.getAttribute('data-completed') === 'true';
+        const isImported = row.getAttribute('data-is-imported') === 'true';
+        
+        if (filterType === 'pending') {
+            // Show only incomplete ONLINE quizzes (not recorded, not lessons without quizzes)
+            if (hasQuiz && !isImported && !completed) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        } else {
+            // Show all
+            row.style.display = '';
+            visibleCount++;
+        }
+    });
+    
+    // Update button states
+    document.getElementById('filterAll').classList.toggle('active', filterType === 'all');
+    document.getElementById('filterPending').classList.toggle('active', filterType === 'pending');
+    
+    // Update count
+    const totalCount = rows.length;
+    const countText = filterType === 'pending' 
+        ? `${visibleCount} of ${totalCount} pending`
+        : `${totalCount} lessons`;
+    document.getElementById('lessonCount').textContent = countText;
+}
+
 function getCSRFToken() {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -178,6 +311,37 @@ function getCSRFToken() {
         }
     }
     return cookieValue;
+}
+
+function switchCourse(courseId) {
+    if (courseId) {
+        window.location.href = '{% url "student_course_quizzes" "00000000-0000-0000-0000-000000000000" %}'.replace('00000000-0000-0000-0000-000000000000', courseId);
+    }
+}
+
+function trackLessonView(lessonId) {
+    // Track lesson view/interaction
+    fetch(`/api/courses/lessons/${lessonId}/track_interaction/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({ interaction_type: 'VIEW' })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Update the lesson item to show it was viewed (optional visual feedback)
+        const lessonItem = document.querySelector(`div.lesson-item[data-lesson-id="${lessonId}"]`);
+        if (lessonItem) {
+            lessonItem.setAttribute('data-viewed', 'true');
+        }
+        console.log('Lesson view tracked:', lessonId);
+    })
+    .catch(error => {
+        console.error('Failed to track lesson view:', error);
+    });
+    return true; // Allow the link to proceed
 }
 
 function reportDifficulty(courseId, lessonId) {
@@ -220,6 +384,8 @@ $(function() {
                 button.removeClass("btn-outline-success").addClass("btn-success");
                 button.html('<i class="fas fa-check me-1"></i>Completed');
                 button.prop("disabled", true);
+                // Reload to update status
+                location.reload();
             },
             error: function(xhr) {
                 alert("Could not mark lesson complete. Please try again.");

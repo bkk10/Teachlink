@@ -1,0 +1,394 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeachLink - AI-Powered Educational Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/landing.css' %}">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <span class="logo-text">TeachLink</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#ai-engine">AI Engine</a></li>
+                <li><a href="#dashboards">Dashboards</a></li>
+                <li><a href="#architecture">Architecture</a></li>
+            </ul>
+            <a href="/dashboard/login/" class="cta-button">Get Started</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-bg">
+            <div class="gradient-orb orb-1"></div>
+            <div class="gradient-orb orb-2"></div>
+            <div class="gradient-orb orb-3"></div>
+        </div>
+        <div class="hero-content">
+            <div class="badge">
+                <span class="badge-dot"></span>
+                <span>AI-Powered Education Platform</span>
+            </div>
+            <h1 class="hero-title">
+                Predict Student Success.<br>
+                <span class="gradient-text">Prevent Dropouts.</span>
+                <br>Empower Educators.
+            </h1>
+            <p class="hero-subtitle">
+                TeachLink combines machine learning with intuitive course management 
+                to identify at-risk students before they fall behind.
+            </p>
+            <div class="hero-buttons">
+                <a href="/dashboard/login/" class="btn-primary">
+                    <span>Get Started</span>
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+                <button class="btn-secondary" onclick="document.getElementById('features').scrollIntoView({behavior: 'smooth'})">Learn More</button>
+            </div>
+            
+            <!-- Hero Visual -->
+            <div class="hero-visual">
+                <div class="dashboard-preview">
+                    <div class="preview-header">
+                        <div class="window-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <span class="window-title">Teacher Dashboard</span>
+                    </div>
+                    <div class="preview-content">
+                        <div class="preview-card risk-card">
+                            <div class="card-header">
+                                <span class="card-title">Risk Analysis</span>
+                                <span class="risk-badge high">High Risk: 12</span>
+                            </div>
+                            <div class="risk-chart">
+                                <div class="chart-bar" style="--height: 75%; --color: #ef4444;"></div>
+                                <div class="chart-bar" style="--height: 45%; --color: #f59e0b;"></div>
+                                <div class="chart-bar" style="--height: 80%; --color: #ef4444;"></div>
+                                <div class="chart-bar" style="--height: 30%; --color: #10b981;"></div>
+                                <div class="chart-bar" style="--height: 55%; --color: #f59e0b;"></div>
+                            </div>
+                        </div>
+                        <div class="preview-card students-card">
+                            <div class="card-header">
+                                <span class="card-title">At-Risk Students</span>
+                            </div>
+                            <div class="student-list">
+                                <div class="student-item">
+                                    <div class="student-avatar">JD</div>
+                                    <div class="student-info">
+                                        <span class="student-name">John Doe</span>
+                                        <span class="student-risk">Dropout Risk: 78%</span>
+                                    </div>
+                                    <span class="alert-icon">⚠️</span>
+                                </div>
+                                <div class="student-item">
+                                    <div class="student-avatar">AS</div>
+                                    <div class="student-info">
+                                        <span class="student-name">Alice Smith</span>
+                                        <span class="student-risk">Performance Drop</span>
+                                    </div>
+                                    <span class="alert-icon">⚠️</span>
+                                </div>
+                                <div class="student-item">
+                                    <div class="student-avatar">MJ</div>
+                                    <div class="student-info">
+                                        <span class="student-name">Mike Johnson</span>
+                                        <span class="student-risk">Disengaged</span>
+                                    </div>
+                                    <span class="alert-icon">⚠️</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <div class="mouse">
+                <div class="wheel"></div>
+            </div>
+            <span>Scroll to explore</span>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats-section">
+        <div class="stats-container">
+            <div class="stat-item">
+                <span class="stat-number" data-count="85">0</span><span class="stat-suffix">%</span>
+                <span class="stat-label">Prediction Accuracy</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" data-count="5000">0</span><span class="stat-suffix">+</span>
+                <span class="stat-label">Students Monitored</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" data-count="40">0</span><span class="stat-suffix">%</span>
+                <span class="stat-label">Dropout Reduction</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" data-count="24">0</span><span class="stat-suffix">/7</span>
+                <span class="stat-label">Real-time Monitoring</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+        <div class="section-header">
+            <span class="section-badge">Core Features</span>
+            <h2 class="section-title">Everything You Need to <span class="gradient-text">Support Students</span></h2>
+            <p class="section-subtitle">A comprehensive platform designed for modern education</p>
+        </div>
+        
+        <div class="features-grid">
+            <div class="feature-card large">
+                <div class="feature-visual">
+                    <div class="ml-visual">
+                        <div class="neural-network">
+                            <div class="layer input-layer">
+                                <div class="node" data-label="Login"></div>
+                                <div class="node" data-label="Scores"></div>
+                                <div class="node" data-label="Time"></div>
+                                <div class="node" data-label="Progress"></div>
+                            </div>
+                            <div class="connections">
+                                <svg viewBox="0 0 300 200">
+                                    <defs>
+                                        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" style="stop-color:#6366f1;stop-opacity:0.3" />
+                                            <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:0.6" />
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M30 40 Q150 20 270 100" stroke="url(#lineGrad)" stroke-width="1" fill="none" class="connection-line"/>
+                                    <path d="M30 80 Q150 50 270 100" stroke="url(#lineGrad)" stroke-width="1" fill="none" class="connection-line"/>
+                                    <path d="M30 120 Q150 150 270 100" stroke="url(#lineGrad)" stroke-width="1" fill="none" class="connection-line"/>
+                                    <path d="M30 160 Q150 180 270 100" stroke="url(#lineGrad)" stroke-width="1" fill="none" class="connection-line"/>
+                                </svg>
+                            </div>
+                            <div class="layer output-layer">
+                                <div class="node risk-output" data-label="Risk Score"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="feature-content">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">ML-Powered Risk Prediction</h3>
+                    <p class="feature-description">
+                        Our advanced machine learning engine analyzes student engagement patterns, 
+                        quiz scores, login frequency, and lesson completion to predict dropout risk.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Real-time risk scoring (High/Medium/Low)</li>
+                        <li>Multi-factor analysis</li>
+                        <li>Predictive alerts before failure</li>
+                        <li>Historical trend tracking</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon blue">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h3 class="feature-title">Intelligent Course Management</h3>
+                <p class="feature-description">Create structured courses with modules and lessons. Enrollment keys make student onboarding seamless.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon purple">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h3 class="feature-title">Smart Assessment Platform</h3>
+                <p class="feature-description">Create quizzes with multiple question types. Automatic grading and performance analytics.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon orange">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h3 class="feature-title">Automated Alert System</h3>
+                <p class="feature-description">Intelligent notifications for dropout risk, performance drops, and disengagement patterns.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon green">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h3 class="feature-title">Comprehensive Analytics</h3>
+                <p class="feature-description">Track course progress, quiz performance, and generate detailed reports for data-driven decisions.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI Engine Section -->
+    <section id="ai-engine" class="ai-section">
+        <div class="section-header light">
+            <span class="section-badge dark">AI Engine</span>
+            <h2 class="section-title light">How Our <span class="gradient-text-alt">Machine Learning</span> Works</h2>
+            <p class="section-subtitle light">Multi-layered analysis for accurate predictions</p>
+        </div>
+
+        <div class="ai-pipeline">
+            <div class="pipeline-step">
+                <div class="step-number">01</div>
+                <div class="step-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h3 class="step-title">Data Collection</h3>
+                <p class="step-description">Aggregates login frequency, quiz scores, lesson completion, and engagement metrics.</p>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step">
+                <div class="step-number">02</div>
+                <div class="step-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h3 class="step-title">Risk Engine</h3>
+                <p class="step-description">ML algorithms calculate weighted risk scores based on multiple behavioral factors.</p>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step">
+                <div class="step-number">03</div>
+                <div class="step-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h3 class="step-title">Alert Generation</h3>
+                <p class="step-description">Automatically generates alerts for high-risk students and sends notifications.</p>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step">
+                <div class="step-number">04</div>
+                <div class="step-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h3 class="step-title">Dashboard Insights</h3>
+                <p class="step-description">Visualizes risk trends, difficulty analysis, and actionable recommendations.</p>
+            </div>
+        </div>
+
+        <div class="risk-types">
+            <h3 class="risk-types-title">Alert Types We Monitor</h3>
+            <div class="risk-cards">
+                <div class="risk-type-card high">
+                    <div class="risk-indicator"></div>
+                    <span class="risk-type-label">Dropout Risk</span>
+                    <p>Predicted course abandonment based on engagement decline</p>
+                </div>
+                <div class="risk-type-card medium">
+                    <div class="risk-indicator"></div>
+                    <span class="risk-type-label">Performance Drop</span>
+                    <p>Sudden decrease in quiz scores or assignment quality</p>
+                </div>
+                <div class="risk-type-card">
+                    <div class="risk-indicator"></div>
+                    <span class="risk-type-label">Disengagement</span>
+                    <p>Reduced login frequency and lesson participation</p>
+                </div>
+                <div class="risk-type-card">
+                    <div class="risk-indicator"></div>
+                    <span class="risk-type-label">Behind Schedule</span>
+                    <p>Missing deadlines and falling behind course timeline</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="cta-bg">
+            <div class="cta-orb orb-1"></div>
+            <div class="cta-orb orb-2"></div>
+        </div>
+        <div class="cta-content">
+            <h2 class="cta-title">Ready to Transform Education?</h2>
+            <p class="cta-subtitle">Join institutions using TeachLink to predict student success and prevent dropouts.</p>
+            <div class="cta-buttons">
+                <a href="/dashboard/login/" class="btn-primary large">
+                    <span>Get Started</span>
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <span class="logo-text">TeachLink</span>
+                </div>
+                <p>AI-powered educational platform for predicting student success and preventing dropouts.</p>
+            </div>
+            <div class="footer-links">
+                <div class="footer-column">
+                    <h4>Platform</h4>
+                    <ul>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#ai-engine">AI Engine</a></li>
+                        <li><a href="/dashboard/login/">Login</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; 2024 TeachLink. Built with Django & Machine Learning.</span>
+        </div>
+    </footer>
+
+    <script src="{% static 'js/landing.js' %}"></script>
+</body>
+</html>

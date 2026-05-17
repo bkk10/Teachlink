@@ -12,6 +12,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <script>Chart.register(ChartDataLabels);</script>
 
     {% load static %}
     <link rel="stylesheet" href="{% static 'dashboard/css/custom.css' %}">
@@ -91,55 +93,29 @@
                     <i class="fas fa-user mr-2"></i>Profile
                 </a>
                 {% else %}
-                <p class="sidebar-section-title">Learning</p>
+                <!-- 6 Core Items Only -->
                 <a href="{% url 'student_dashboard' %}" class="sidebar-link {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">
-                    <i class="fas fa-house mr-2"></i>Overview
+                    <i class="fas fa-home mr-2"></i>Overview
                 </a>
                 <a href="{% url 'dashboard_courses' %}" class="sidebar-link {% if request.resolver_match.url_name == 'dashboard_courses' %}active{% endif %}">
-                    <i class="fas fa-book-open mr-2"></i>My Courses
+                    <i class="fas fa-book mr-2"></i>My Courses
                 </a>
-
-                <p class="sidebar-section-title mt-3">Insights</p>
+                <a href="{% url 'student_pending_assessments' %}" class="sidebar-link {% if request.resolver_match.url_name == 'student_pending_assessments' %}active{% endif %}">
+                    <i class="fas fa-file-pen mr-2"></i>Pending Assessments
+                    <span id="sidebarPendingCount" class="badge text-bg-warning ms-auto d-none">0</span>
+                </a>
                 <a href="{% url 'student_dashboard' %}#quiz-performance" class="sidebar-link">
                     <i class="fas fa-chart-line mr-2"></i>Quiz History
+                </a>
+                <a href="{% url 'student_risk_history' %}" class="sidebar-link {% if request.resolver_match.url_name == 'student_risk_history' %}active{% endif %}">
+                    <i class="fas fa-shield-alt mr-2"></i>Risk History
                 </a>
                 <a href="{% url 'student_dashboard' %}#notifications" class="sidebar-link">
                     <i class="fas fa-bell mr-2"></i>Notifications
                     <span id="sidebarUnreadCount" class="badge text-bg-primary ms-auto {% if unread_count|default:0 <= 0 %}d-none{% endif %}">{{ unread_count|default:0 }}</span>
                 </a>
 
-                <p class="sidebar-section-title mt-3">Account</p>
-                <a href="{% url 'dashboard_profile' %}" class="sidebar-link {% if request.resolver_match.url_name == 'dashboard_profile' %}active{% endif %}">
-                    <i class="fas fa-user-circle mr-2"></i>Profile
-                </a>
-
-                <div class="sidebar-quick-card mt-3">
-                    <div class="small fw-semibold text-gray-700 mb-2">
-                        <i class="fas fa-compass me-1"></i>Today Snapshot
-                    </div>
-                    <div class="sidebar-stat-grid">
-                        <div class="sidebar-stat-item">
-                            <span class="sidebar-stat-label">Courses</span>
-                            <span class="sidebar-stat-value">{{ student_active_courses|default:0 }}</span>
-                        </div>
-                        <div class="sidebar-stat-item">
-                            <span class="sidebar-stat-label">Avg Progress</span>
-                            <span class="sidebar-stat-value">{{ student_avg_progress|default:0 }}%</span>
-                        </div>
-                    </div>
-                    <div class="small text-gray-600 mt-2">
-                        Highest Course Risk:
-                        <span class="fw-semibold text-{{ student_risk_tone|default:'secondary' }}">{{ student_risk_snapshot|default:'UNKNOWN' }}</span>
-                    </div>
-                    {% if student_upcoming_deadline %}
-                    <div class="small text-gray-600 mt-1">
-                        Next deadline: {{ student_upcoming_deadline.course_title }} ({{ student_upcoming_deadline.days_left }} day(s))
-                    </div>
-                    {% else %}
-                    <div class="small text-gray-500 mt-1">No upcoming deadlines</div>
-                    {% endif %}
-                </div>
-
+                <!-- Quick Actions (Join Course) -->
                 <details class="sidebar-quick-card mt-3">
                     <summary class="small fw-semibold text-gray-700" style="cursor:pointer;">
                         <i class="fas fa-key me-1"></i>Join Course by Key
@@ -153,37 +129,42 @@
                 </details>
                 {% endif %}
             </nav>
-
-            <div class="sidebar-footer mt-auto px-5 py-4 border-t border-gray-200">
-                <div class="mb-3">
-                    <p class="text-sm font-medium text-gray-800">{{ user.display_name }}</p>
-                    <p class="text-xs text-gray-500">
-                        {% if user.is_staff or user.is_superuser %}Administrator{% else %}{{ user.get_role_display }}{% endif %}
-                    </p>
-                </div>
-                <form method="post" action="{% url 'dashboard_logout' %}" class="inline">
-                    {% csrf_token %}
-                    <button type="submit" class="w-full text-left sidebar-link">
-                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
-                    </button>
-                </form>
-            </div>
         </aside>
 
         <div class="dashboard-main">
             <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-end">
-                <a href="{% url 'dashboard_profile' %}" class="text-decoration-none d-flex flex-column align-items-center ms-auto">
-                    {% if user.avatar %}
-                    <img src="{{ user.avatar.url }}" alt="{{ user.display_name }}" class="rounded-circle border border-gray-200" style="width: 40px; height: 40px; object-fit: cover;">
-                    {% else %}
-                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold" style="width: 40px; height: 40px; background: linear-gradient(135deg, #2563eb, #1d4ed8);">
-                        {{ user.display_name|first|upper }}
-                    </div>
-                    {% endif %}
-                    <span class="mt-1 text-xs text-gray-700">{{ user.display_name }}</span>
-                </a>
+                <!-- User Dropdown -->
+                <div class="dropdown ms-auto">
+                    <button class="btn btn-link text-decoration-none d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="{{ user.display_name }}" class="rounded-circle border border-gray-200" style="width: 36px; height: 36px; object-fit: cover;">
+                        {% else %}
+                        <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold" style="width: 36px; height: 36px; background: linear-gradient(135deg, #2563eb, #1d4ed8);">
+                            {{ user.display_name|first|upper }}
+                        </div>
+                        {% endif %}
+                        <span class="text-sm text-gray-700 d-none d-md-inline">{{ user.display_name }}</span>
+                        <i class="fas fa-chevron-down text-gray-400 small"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><a class="dropdown-item" href="{% url 'dashboard_profile' %}"><i class="fas fa-user-circle me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="{% url 'student_deadlines' %}"><i class="fas fa-calendar-day me-2"></i>Deadlines</a></li>
+                        <li><a class="dropdown-item" href="{% url 'student_dashboard' %}#reportedDifficulties"><i class="fas fa-flag me-2"></i>My Difficulties</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{% url 'dashboard_help' %}"><i class="fas fa-circle-question me-2"></i>Help & Support</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form method="post" action="{% url 'dashboard_logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item text-danger"><i class="fas fa-sign-out-alt me-2"></i>Logout</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
             </header>
             <main class="py-6 px-4 sm:px-6 lg:px-8">
+                <!-- Breadcrumbs Navigation -->
+                {% block breadcrumbs %}{% endblock %}
     {% else %}
     <main class="py-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -194,8 +175,8 @@
     {% if user.is_authenticated %}
             </main>
             <footer class="bg-white border-t border-gray-200">
-                <div class="py-4 px-4 sm:px-6 lg:px-8">
-                    <p class="text-sm text-gray-500 text-center">
+                <div class="py-3 px-4 sm:px-6 lg:px-8">
+                    <p class="text-sm text-gray-500 text-center mb-0">
                         TeachLink (c) 2026 - Intelligent Student Risk Detection System
                     </p>
                 </div>

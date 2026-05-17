@@ -76,44 +76,67 @@
         </div>
         <div class="mt-3 d-flex gap-2 flex-wrap">
             <a href="{% url 'dashboard_courses' %}" class="btn btn-light btn-sm">
-                <i class="fas fa-book-open me-1"></i>Open My Courses
+                <i class="fas fa-book me-1"></i>Open My Courses
             </a>
         </div>
         <div id="heroAwareness" class="mt-3 d-flex flex-wrap gap-2"></div>
     </section>
 
-    <section id="quickStats" class="row g-3 mb-4">
-        <div class="col-12 text-muted">Loading your metrics...</div>
+    <!-- Single Status Bar - condensed metrics -->
+    <section id="quickStats" class="card dashboard-card mb-4">
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap align-items-center gap-3" id="statusBarContent">
+                <div class="text-muted small">Loading your status...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Next Lesson Alert - Prominent at top -->
+    <section id="nextLessonAlert" class="d-none mb-4">
+        <div class="alert alert-primary d-flex align-items-center justify-content-between" role="alert">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center text-white" style="width: 48px; height: 48px; background: linear-gradient(135deg, #0b5ed7, #1d4ed8);">
+                    <i class="fas fa-play"></i>
+                </div>
+                <div>
+                    <div class="fw-bold fs-5 mb-1">Continue Learning</div>
+                    <div id="nextLessonText" class="text-primary-emphasis">Loading next lesson...</div>
+                </div>
+            </div>
+            <a id="nextLessonLink" href="#" class="btn btn-primary">
+                <i class="fas fa-arrow-right me-2"></i>Resume
+            </a>
+        </div>
     </section>
 
     <div class="row g-4">
         <div class="col-xl-8">
-            <section class="card dashboard-card mb-4">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold">Current Courses</h6>
-                    <a href="{% url 'dashboard_courses' %}" class="btn btn-sm btn-outline-primary">My Courses</a>
+            <!-- Risk Factor Summary with Deficit Percentages -->
+            <section id="riskFactorsCard" class="card dashboard-card mb-4 d-none">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-chart-pie text-primary me-2"></i>Risk Breakdown
+                    </h6>
                 </div>
-                <div class="card-body" id="coursesList">
-                    <div class="text-muted">Loading courses...</div>
+                <div class="card-body" id="riskFactorsContent">
+                    <div class="text-muted">Loading risk analysis...</div>
                 </div>
             </section>
 
+            <!-- Recent Quiz Attempts with Graph -->
             <section id="quiz-performance" class="card dashboard-card">
-                <div class="card-header bg-white">
-                    <h6 class="mb-0 fw-bold">Recent Quiz Attempts</h6>
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">Quiz Performance History</h6>
+                    <select id="quizCourseFilter" class="form-select form-select-sm" style="width: auto; min-width: 180px;">
+                        <option value="all">All Courses</option>
+                    </select>
                 </div>
                 <div class="card-body">
-                    <div id="performanceTrendWrap" style="height: 280px;">
-                        <canvas id="performanceChart"></canvas>
+                    <div style="height: 220px; margin-bottom: 1rem;">
+                        <canvas id="quizHistoryChart"></canvas>
                     </div>
-                    <div id="noPerformanceData" class="small text-muted mt-3">
-                        No completed quiz attempts yet.
-                    </div>
-                    <div class="mt-4">
-                        <h6 class="fw-semibold mb-2">Attempt History</h6>
-                        <div id="recentQuizAttempts" class="list-group list-group-flush">
-                            <div class="list-group-item text-muted px-0">Loading recent attempts...</div>
-                        </div>
+                    <div id="recentQuizAttempts" class="list-group list-group-flush">
+                        <div class="list-group-item text-muted px-0">Loading recent attempts...</div>
                     </div>
                 </div>
             </section>
@@ -130,31 +153,21 @@
         </div>
 
         <div class="col-xl-4">
-            <!-- NEW: Risk Explainability Card - shows breakdown of why student has their risk level -->
-            <section id="riskExplainCard" class="card dashboard-card mb-4">
-                <div class="card-header bg-white">
-                    <h6 class="mb-0 fw-bold">Why Your Risk Level?</h6>
-                </div>
-                <div class="card-body" id="riskExplainContent">
-                    <div class="text-muted">Loading your risk analysis...</div>
-                </div>
-            </section>
-
-            <section class="card dashboard-card mb-4">
-                <div class="card-header bg-white">
-                    <h6 class="mb-0 fw-bold">Learning Status</h6>
-                </div>
-                <div class="card-body" id="focusStatusCard">
-                    <div class="text-muted">Loading your learning status...</div>
-                </div>
-            </section>
-
             <section id="deadlinesCard" class="card dashboard-card mb-4">
                 <div class="card-header bg-white">
                     <h6 class="mb-0 fw-bold">Upcoming Deadlines</h6>
                 </div>
                 <div id="deadlinesList" class="list-group list-group-flush">
                     <div class="list-group-item text-muted">Loading deadlines...</div>
+                </div>
+            </section>
+
+            <section id="courseGoalsCard" class="card dashboard-card mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold">Current Progress</h6>
+                </div>
+                <div id="courseGoalsList" class="list-group list-group-flush">
+                    <div class="list-group-item text-muted">Loading progress...</div>
                 </div>
             </section>
 
@@ -173,8 +186,6 @@
 
 {% block extra_js %}
 <script>
-let performanceChart = null;
-
 $(function () {
     loadStudentDashboard();
     $(document).on("click", ".mark-read-btn", function() {
@@ -211,15 +222,15 @@ function loadStudentDashboard() {
         success: function (data) {
             window.__notificationSuppressedCount = Number(data.notifications_suppressed_count || 0);
             renderHeader(data);
-            renderStats(data);
-            renderCourses(data.courses || []);
-            renderRiskExplainability(data); // NEW: render risk explainability card
-            renderPerformance(data.performance_trend || []);
-            renderRecentAttempts(data.recent_quiz_attempts || []);
+            renderStats(data); // Single status bar
+            renderNextLessonAlert(data); // Prominent next lesson at top
+            renderRiskFactors(data); // Risk breakdown with deficit percentages
+            renderRecentAttempts(data.recent_quiz_attempts || [], data.courses || []); // Chart with course filter
             renderNotifications(data.notifications || []);
             renderDeadlines(data.upcoming_deadlines || []);
-            renderFocusStatus(data.focus_status || {}, data);
+            renderCurrentProgress(data.courses || []);
             renderNextSteps(data);
+            updateSidebarBadges(data);
             if (typeof data.unread_count !== "undefined") {
                 setSidebarUnreadCount(data.unread_count);
             }
@@ -227,7 +238,7 @@ function loadStudentDashboard() {
         error: function (xhr) {
             console.error("Student dashboard load failed:", xhr.status, xhr.responseText);
             $("#quickStats").html('<div class="col-12 text-danger">Unable to load dashboard data right now.</div>');
-            $("#coursesList").html('<div class="text-danger">Unable to load courses.</div>');
+            $("#recentQuizAttempts").html('<div class="list-group-item text-danger">Unable to load quiz data.</div>');
             $("#deadlinesList").html('<div class="list-group-item text-danger">Unable to load deadlines.</div>');
             $("#notificationsList").html('<div class="list-group-item text-danger">Unable to load notifications.</div>');
         }
@@ -254,19 +265,19 @@ function renderHeader(data) {
         // Reframe: instead of "HIGH RISK", show as success probability with positive messaging
         const successPct = Math.max(0, 100 - riskScore);
         const healthLabel = successPct >= 70 ? '✓ On Track' : (successPct >= 40 ? '⚠️ At Risk' : '🚨 Critical');
-        $("#riskBadgeDisplay").html(`<span class="badge ${riskClass} fs-5">${healthLabel}</span><br><small class="text-muted">${successPct.toFixed(0)}% Success</small>`);
+        $("#riskBadgeDisplay").html(`<span class="badge ${riskClass} fs-5">${healthLabel}</span><br><small class="text-muted">${successPct.toFixed(0)}% on track</small>`);
     }
 
     const chips = [];
     if (focus.risk_level) {
-        chips.push(`<span class="hero-chip"><i class="fas fa-shield-heart"></i><strong>${focus.risk_level}</strong> risk</span>`);
+        chips.push(`<span class="hero-chip"><i class="fas fa-shield-alt"></i><strong>${focus.risk_level}</strong> risk</span>`);
     }
     if (focus.engagement_level) {
         chips.push(`<span class="hero-chip"><i class="fas fa-chart-line"></i><strong>${focus.engagement_level}</strong> engagement</span>`);
     }
     if (typeof focus.days_inactive_count !== "undefined") {
-        const label = Number(focus.days_inactive_count || 0) === 0 ? "Active today" : `${focus.days_inactive_count} day(s) inactive`;
-        chips.push(`<span class="hero-chip"><i class="fas fa-clock"></i>${label}</span>`);
+        const label = Number(focus.days_inactive_count || 0) === 0 ? "Today" : `${focus.days_inactive_count} day(s) ago`;
+        chips.push(`<span class="hero-chip"><i class="fas fa-clock"></i>Last activity: ${label}</span>`);
     }
     if (Number(data.pending_assessments_total || 0) > 0) {
         chips.push(`<span class="hero-chip"><i class="fas fa-file-pen"></i>${data.pending_assessments_total} assessment(s) waiting</span>`);
@@ -274,91 +285,214 @@ function renderHeader(data) {
     $("#heroAwareness").html(chips.join(""));
 }
 
-function statBox(label, value, icon, color) {
-    return `
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card dashboard-card h-100">
-                <div class="card-body d-flex align-items-center">
-                    <span class="rounded-circle d-inline-flex justify-content-center align-items-center ${color} text-white me-3" style="width:40px;height:40px;">
-                        <i class="${icon}"></i>
-                    </span>
-                    <div>
-                        <div class="metric-label">${label}</div>
-                        <div class="metric-value">${value}</div>
-                    </div>
-                </div>
+// Single status bar rendering (condensed from 4 cards)
+function renderStats(data) {
+    const focus = data.focus_status || {};
+    const pendingAssessments = data.pending_assessments_total || 0;
+    
+    // Build status chips
+    const chips = [];
+    
+    // Risk chip
+    if (focus.risk_level) {
+        const riskClass = focus.risk_level === 'HIGH' ? 'text-bg-danger' : (focus.risk_level === 'MEDIUM' ? 'text-bg-warning' : 'text-bg-success');
+        chips.push(`<span class="badge ${riskClass}"><i class="fas fa-shield-alt me-1"></i>${focus.risk_level} Risk</span>`);
+    }
+    
+    // Engagement chip
+    if (focus.engagement_level) {
+        const engagementColor = focus.engagement_level === 'HIGH' ? 'text-bg-success' : (focus.engagement_level === 'MEDIUM' ? 'text-bg-warning' : 'text-bg-secondary');
+        chips.push(`<span class="badge ${engagementColor}"><i class="fas fa-chart-line me-1"></i>${focus.engagement_level} Engagement</span>`);
+    }
+    
+    // Activity chip
+    if (typeof focus.days_inactive_count !== "undefined") {
+        const activityLabel = Number(focus.days_inactive_count || 0) === 0 ? "Active Today" : `Inactive ${focus.days_inactive_count}d`;
+        const activityColor = Number(focus.days_inactive_count || 0) === 0 ? 'text-bg-success' : (Number(focus.days_inactive_count) > 3 ? 'text-bg-danger' : 'text-bg-warning');
+        chips.push(`<span class="badge ${activityColor}"><i class="fas fa-clock me-1"></i>${activityLabel}</span>`);
+    }
+    
+    // Pending assessments chip
+    if (pendingAssessments > 0) {
+        chips.push(`<span class="badge text-bg-warning"><i class="fas fa-file-pen me-1"></i>${pendingAssessments} Pending</span>`);
+    }
+    
+    // Progress mini-bar
+    const progress = Number(data.overall_progress || 0).toFixed(0);
+    
+    const html = `
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            ${chips.join('')}
+        </div>
+        <div class="flex-grow-1 ms-3" style="min-width: 150px;">
+            <div class="d-flex justify-content-between small mb-1">
+                <span class="text-muted">Overall Progress</span>
+                <span class="fw-semibold">${progress}%</span>
+            </div>
+            <div class="progress" style="height: 6px;">
+                <div class="progress-bar bg-primary" role="progressbar" style="width: ${progress}%"></div>
             </div>
         </div>
     `;
+    
+    $("#statusBarContent").html(html);
 }
 
-function renderStats(data) {
-     const focus = data.focus_status || {};
-     const riskValue = focus.risk_level ? `${focus.risk_level} (${Number(focus.risk_score_pct || 0).toFixed(0)}%)` : "Not enough data";
-     const engagementValue = focus.engagement_level ? `${focus.engagement_level} (${Number(focus.engagement_score_pct || data.overall_engagement_score_pct || 0).toFixed(0)}%)` : "Not enough data";
-     const inactivityValue = typeof focus.days_inactive_count !== "undefined"
-         ? (Number(focus.days_inactive_count || 0) === 0 ? "Active today" : `${focus.days_inactive_count} day(s)`)
-         : "Not enough data";
-     const pendingAssessments = data.pending_assessments_total || 0;
- 
-     const html = [
-         statBox("Current Risk", riskValue, "fas fa-triangle-exclamation", "bg-danger"),
-         statBox("Engagement", engagementValue, "fas fa-heart-pulse", "bg-success"),
-         statBox("Inactivity", inactivityValue, "fas fa-clock", "bg-info"),
-         statBox("Assessments Waiting", pendingAssessments, "fas fa-file-signature", "bg-warning")
-     ].join("");
- 
-     $("#quickStats").html(html);
- }
-
-// NEW: Render risk explainability card showing breakdown of risk factors
-function renderRiskExplainability(data) {
+// Prominent Next Lesson alert at top of dashboard
+function renderNextLessonAlert(data) {
+    const courses = data.courses || [];
     const focus = data.focus_status || {};
-    if (!focus.risk_level || !focus.course_title) {
-        $("#riskExplainCard").addClass("d-none");
+    
+    // Find the priority next lesson (from focus or first course with next lesson)
+    let nextLesson = null;
+    let courseTitle = '';
+    let courseUrl = '#';
+    
+    if (focus.next_lesson && focus.course_title) {
+        nextLesson = focus.next_lesson;
+        courseTitle = focus.course_title;
+        courseUrl = focus.course_url || '#';
+    } else {
+        // Find first course with a next lesson
+        const courseWithNext = courses.find(c => c.next_lesson);
+        if (courseWithNext) {
+            nextLesson = courseWithNext.next_lesson;
+            courseTitle = courseWithNext.course_title;
+            courseUrl = courseWithNext.my_course_url || courseWithNext.course_assessment_url || '#';
+        }
+    }
+    
+    const alert = $("#nextLessonAlert");
+    const text = $("#nextLessonText");
+    const link = $("#nextLessonLink");
+    
+    if (!nextLesson) {
+        alert.addClass("d-none");
         return;
     }
-    $("#riskExplainCard").removeClass("d-none");
-
-    const riskClass = riskBadge(focus.risk_level);
-    const factors = (focus.risk_explainability || {}).factors || [];
     
-    let html = `
-        <div class="mb-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="badge ${riskClass} fs-6">${focus.risk_level}</span>
-                <span class="fw-semibold">${Number(focus.risk_score_pct || 0).toFixed(1)}%</span>
-            </div>
-            <div class="small text-muted">This score is based on three main factors:</div>
-        </div>
-    `;
+    alert.removeClass("d-none");
+    text.html(`<strong>${nextLesson.title}</strong> in ${courseTitle}`);
+    link.attr("href", nextLesson.open_url || courseUrl);
+}
 
-    if (factors && factors.length > 0) {
-        html += `<div class="row g-2">`;
-        factors.forEach(f => {
-            const factorColor = f.contribution_pct >= 40 ? "danger" : (f.contribution_pct >= 25 ? "warning" : "info");
-            html += `
-                <div class="col-12">
-                    <div class="p-2 border rounded small">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <strong>${f.name}</strong>
-                            <span class="badge text-bg-${factorColor}">${Number(f.contribution_pct || 0).toFixed(0)}%</span>
-                        </div>
-                        <div class="text-muted mt-1">${f.value_display || "Value data pending"}</div>
-                    </div>
-                </div>
-            `;
-        });
-        html += `</div>`;
-    } else {
-        html += `<div class="text-muted small">Risk factors are being calculated. Please refresh in a moment.</div>`;
+// Risk Breakdown - shows actual deficit percentages (Progress Deficit, Quiz Deficit)
+function renderRiskFactors(data) {
+    const focus = data.focus_status || {};
+    const card = $("#riskFactorsCard");
+    const content = $("#riskFactorsContent");
+    
+    if (!focus.risk_level || !focus.course_title) {
+        card.addClass("d-none");
+        return;
     }
-
-    html += `<div class="alert alert-info small mt-3 mb-0">
-        <strong>💡 Tip:</strong> Improving your engagement and quiz performance will directly lower your risk level.
-    </div>`;
-
-    $("#riskExplainContent").html(html);
+    
+    // Build deficit metrics similar to course cards - EXPLICIT NUMBERS
+    let deficitsHtml = '';
+    
+    // Progress Deficit - show exact percentage
+    const progressGap = focus.progress_gap || 0;
+    if (progressGap > 0) {
+        deficitsHtml += `
+            <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-chart-line text-danger"></i>
+                    <span>Progress deficit:</span>
+                </div>
+                <span class="badge bg-danger">${Math.round(progressGap)}% behind</span>
+            </div>
+        `;
+    } else {
+        deficitsHtml += `
+            <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-check-circle text-success"></i>
+                    <span>Progress deficit:</span>
+                </div>
+                <span class="badge bg-success">On track (0%)</span>
+            </div>
+        `;
+    }
+    
+    // Quiz Performance Deficit - show exact deficit number
+    const quizAvg = focus.avg_quiz_score || 0;
+    const quizDeficit = Math.max(0, 70 - quizAvg); // Assuming 70% is target
+    if (quizDeficit > 0 && quizAvg > 0) {
+        deficitsHtml += `
+            <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-clipboard-check text-warning"></i>
+                    <span>Quiz performance deficit:</span>
+                </div>
+                <span class="badge bg-warning">${Math.round(quizDeficit)}% below target</span>
+            </div>
+        `;
+    } else if (quizAvg > 0) {
+        deficitsHtml += `
+            <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-check-circle text-success"></i>
+                    <span>Quiz performance deficit:</span>
+                </div>
+                <span class="badge bg-success">Meeting target (0%)</span>
+            </div>
+        `;
+    }
+    
+    // Pending Assessments Count - show exact number
+    const totalPendingAssessments = data.pending_assessments_total || 0;
+    if (totalPendingAssessments > 0) {
+        deficitsHtml += `
+            <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-file-pen text-warning"></i>
+                    <span>Pending assessments:</span>
+                </div>
+                <span class="badge bg-warning">${totalPendingAssessments} not started</span>
+            </div>
+        `;
+    }
+    
+    // Failed Attempts with exact count
+    if (focus.failed_attempts_count > 0) {
+        deficitsHtml += `
+            <div class="d-flex align-items-center justify-content-between py-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-times-circle text-danger"></i>
+                    <span>Failed quiz attempts:</span>
+                </div>
+                <span class="badge bg-danger">${focus.failed_attempts_count} failed</span>
+            </div>
+        `;
+    }
+    
+    // If no deficits at all, show positive message
+    if (!deficitsHtml) {
+        deficitsHtml = `
+            <div class="alert alert-success mb-0">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Excellent!</strong> No deficits detected. You're on track with all metrics.
+            </div>
+        `;
+    }
+    
+    // Risk score header with color coding
+    const riskClass = riskBadge(focus.risk_level);
+    const riskScore = Number(focus.risk_score_pct || 0).toFixed(1);
+    
+    const html = `
+        <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge ${riskClass} fs-6">${focus.risk_level}</span>
+                <span class="fw-bold">Risk Score: ${riskScore}%</span>
+            </div>
+            <span class="small text-muted">${focus.course_title}</span>
+        </div>
+        ${deficitsHtml}
+    `;
+    
+    content.html(html);
+    card.removeClass("d-none");
 }
 
 function riskBadge(level) {
@@ -366,174 +500,345 @@ function riskBadge(level) {
     return map[level] || "text-bg-secondary";
 }
 
-function renderCourses(courses) {
-    if (!courses.length) {
-        $("#coursesList").html(`
-            <div class="text-center py-4">
-                <div class="text-muted mb-3">You are not enrolled in any active courses.</div>
-                <a href="{% url 'dashboard_courses' %}" class="btn btn-outline-primary btn-sm">Go to Courses</a>
-            </div>
-        `);
-        return;
+// Quiz History Chart
+let quizHistoryChart = null;
+let allQuizAttempts = [];
+
+function renderRecentAttempts(attempts, allCourses) {
+    allQuizAttempts = attempts || [];
+    
+    // Populate course filter with ALL enrolled courses, not just those with attempts
+    populateCourseFilter(attempts, allCourses);
+    
+    // Filter attempts based on selected course
+    const selectedCourse = $("#quizCourseFilter").val() || 'all';
+    
+    const filteredAttempts = selectedCourse === 'all' 
+        ? attempts 
+        : attempts.filter(a => a.course_id === selectedCourse);
+    
+    // Render chart with filtered data
+    renderQuizHistoryChart(filteredAttempts);
+    
+    // Render list
+    if (filteredAttempts.length === 0) {
+        // Check if selected course has no attempts
+        if (selectedCourse !== 'all') {
+            const selectedCourseData = allCourses.find(c => c.course_id === selectedCourse);
+            const courseName = selectedCourseData ? selectedCourseData.course_title : 'this course';
+            $("#recentQuizAttempts").html(`<div class="list-group-item text-muted px-0">No quiz attempts for ${courseName} yet. Take your first quiz to see your performance history!</div>`);
+        } else {
+            $("#recentQuizAttempts").html('<div class="list-group-item text-muted px-0">No quiz attempts yet. Take your first quiz to see your performance history!</div>');
+        }
+        if (quizHistoryChart) {
+            quizHistoryChart.destroy();
+            quizHistoryChart = null;
+        }
+    } else {
+        const html = filteredAttempts.slice(0, 10).map(a => {
+            const passingScore = a.passing_score || 70;
+            const score = Math.round(a.score || 0);
+            // Determine pass status based on score vs passing threshold
+            const isPassed = score >= passingScore;
+            const scoreClass = isPassed ? "text-success" : "text-danger";
+            const statusLabel = a.status === "TIMED_OUT" ? "Timed out" : (isPassed ? "Passed" : "Failed");
+            const date = a.date ? new Date(a.date).toLocaleDateString() : "Unknown date";
+            const attemptsLeft = a.attempts_left !== undefined ? a.attempts_left : 0;
+            const maxAttempts = a.max_attempts || 1;
+            const attemptsUsed = a.attempts_used || 0;
+            
+            // Check if this is an imported/physical score vs online quiz
+            const isImported = a.is_imported === true;
+            const hasOnlineQuiz = a.has_online_quiz === true;
+            
+            // Source badge for transparency
+            let sourceBadge = '';
+            let sourceNote = '';
+            if (isImported && !hasOnlineQuiz) {
+                // Purely imported score - no online quiz available
+                sourceBadge = `<span class="badge bg-info text-dark me-1" title="This score was recorded by your teacher from a physical test"><i class="fas fa-file-import me-1"></i>Physical score</span>`;
+                sourceNote = `<div class="small text-muted mt-1"><i class="fas fa-info-circle me-1"></i>This score was recorded by your teacher from a physical test.</div>`;
+            } else if (isImported && hasOnlineQuiz) {
+                // Imported score but online retake is possible
+                sourceBadge = `<span class="badge bg-secondary me-1" title="Physical score - online retake available"><i class="fas fa-file-import me-1"></i>Physical</span>`;
+            }
+            
+            // Smart retake button logic with transparency for imported scores
+            let actionButtons = '';
+            if (!hasOnlineQuiz && isImported) {
+                // No online quiz available - show View Score only
+                actionButtons = `<span class="btn btn-sm btn-outline-secondary ms-2 disabled" title="No online quiz available">View Score</span>`;
+            } else if (attemptsLeft > 0) {
+                // Has attempts remaining - show both Retake and View Results
+                if (isPassed) {
+                    // Passed quiz - show "Retake (improve)" with tooltip explaining best score kept
+                    const retakeLabel = (isImported && hasOnlineQuiz) ? 'Retake (online)' : 'Retake (improve)';
+                    actionButtons = `
+                        <a href="/dashboard/student/quizzes/${a.quiz_id}/attempts?take=1" class="btn btn-sm btn-outline-success ms-2" title="You already passed! Retaking is optional practice. Your best score will be kept.">${retakeLabel}</a>
+                        <a href="/dashboard/student/quizzes/${a.quiz_id}/attempts" class="btn btn-sm btn-outline-secondary ms-1">${isImported ? 'Score' : 'Results'}</a>
+                    `;
+                } else {
+                    // Failed quiz - standard retake button
+                    const btnText = `Retake (${attemptsLeft}/${maxAttempts})`;
+                    const retakeLabel = (isImported && hasOnlineQuiz) ? 'Retake (online)' : btnText;
+                    actionButtons = `
+                        <a href="/dashboard/student/quizzes/${a.quiz_id}/attempts?take=1" class="btn btn-sm btn-outline-primary ms-2" title="New score will replace your current ${score}%">${retakeLabel}</a>
+                        <a href="/dashboard/student/quizzes/${a.quiz_id}/attempts" class="btn btn-sm btn-outline-secondary ms-1">${isImported ? 'Score' : 'Results'}</a>
+                    `;
+                }
+            } else {
+                // No attempts left - show View Results only
+                const viewLabel = isImported ? 'View Score' : 'View Results';
+                if (isPassed) {
+                    actionButtons = `<a href="/dashboard/student/quizzes/${a.quiz_id}/attempts" class="btn btn-sm btn-outline-success ms-2">${viewLabel}</a>`;
+                } else {
+                    const lessonUrl = a.lesson_url || '#';
+                    actionButtons = `
+                        <a href="/dashboard/student/quizzes/${a.quiz_id}/attempts" class="btn btn-sm btn-outline-secondary ms-2">${viewLabel}</a>
+                        <a href="${lessonUrl}" class="btn btn-sm btn-outline-warning ms-1" title="Review lesson material"><i class="fas fa-book-open"></i></a>
+                    `;
+                }
+            }
+            
+            return `
+                <div class="list-group-item px-0 py-2">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div style="flex: 1;">
+                            <div class="fw-semibold">${a.quiz_title} ${sourceBadge}</div>
+                            <div class="small text-muted">${a.course_title} · ${date}</div>
+                            <div class="small">
+                                <span class="text-muted">Pass: ${passingScore}% · Used: ${attemptsUsed}/${maxAttempts}</span>
+                            </div>
+                            ${sourceNote}
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold ${scoreClass}">${score}%</div>
+                            <div class="small ${isPassed ? 'text-success' : 'text-danger'}">${statusLabel}</div>
+                            <div class="d-flex justify-content-end mt-1">${actionButtons}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+        $("#recentQuizAttempts").html(html);
     }
-
-    const html = courses.map(c => `
-        <div class="course-row">
-            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                <div>
-                    <div class="fw-semibold">
-                        <a href="${c.my_course_url || c.course_assessment_url}" class="text-decoration-none">${c.course_title}</a>
-                    </div>
-                    <small class="text-muted">Average quiz score: ${Math.round(c.avg_score || 0)}%</small>
-                </div>
-                <span class="badge ${riskBadge(c.risk_level)}">${c.risk_level || "UNKNOWN"}</span>
-            </div>
-
-            <div class="mb-2">
-                <div class="d-flex justify-content-between small text-muted mb-1">
-                    <span>Progress</span>
-                    <span>${Math.round(c.progress || 0)}%</span>
-                </div>
-                <div class="progress progress-thin">
-                    <div class="progress-bar" role="progressbar" style="width: ${Math.round(c.progress || 0)}%"></div>
-                </div>
-            </div>
-
-            <div class="small">
-                ${c.next_lesson ? `<span class="text-muted">Next lesson:</span> ${c.next_lesson.title}` : `<span class="text-muted">No pending lesson.</span>`}
-            </div>
-
-            <div class="mt-2 small text-muted">
-                ${c.expected_progress !== null && c.expected_progress !== undefined
-                    ? `Expected progress: ${Math.round(c.expected_progress)}%`
-                    : `Expected progress: n/a`}
-                ${c.progress_gap !== null && c.progress_gap !== undefined && c.progress_gap > 0
-                    ? `<span class="text-danger ms-2">(${Math.round(c.progress_gap)}% behind)</span>`
-                    : ``}
-            </div>
-
-            <div class="small mt-2 border rounded p-2">
-                <div class="fw-semibold mb-1">
-                    Why this risk level? Risk Score: ${Number((c.risk_explainability || {}).score_pct || 0).toFixed(1)}% (${c.risk_level || "UNKNOWN"})
-                </div>
-                <div class="text-muted mb-1">Lower is better: 0-40% LOW, 40-70% MEDIUM, 70-100% HIGH.</div>
-                ${((c.risk_explainability || {}).factors && (c.risk_explainability || {}).factors.length) ? ((c.risk_explainability || {}).factors || []).slice(0, 3).map(f => `
-                    <div class="d-flex justify-content-between">
-                        <span>${f.name} (${f.value_display})</span>
-                        <span>${Number(f.contribution_pct || 0).toFixed(1)}%</span>
-                    </div>
-                `).join("") : `<div class="text-muted">Risk factors are being calculated. Please refresh in a moment.</div>`}
-            </div>
-
-            <div class="mt-3 d-flex gap-2">
-                ${c.next_lesson && c.next_lesson.open_url
-                    ? `<a href="${c.next_lesson.open_url}" class="btn btn-sm btn-primary">Continue Lesson</a>`
-                    : `<a href="${c.my_course_url || c.course_assessment_url}" class="btn btn-sm btn-primary">Open in My Courses</a>`}
-                <a href="${c.my_course_url || c.course_assessment_url}" class="btn btn-sm btn-outline-secondary">Open Course Plan</a>
-                <button class="btn btn-sm btn-outline-warning report-difficulty-btn" data-course-id="${c.course_id}">
-                    <i class="fas fa-flag me-1"></i>Report Difficulty
-                </button>
-            </div>
-        </div>
-    `).join("");
-
-    $("#coursesList").html(html);
 }
 
-function renderPerformance(points) {
-    const canvas = document.getElementById("performanceChart");
-    if (!canvas) return;
-    if (performanceChart) performanceChart.destroy();
+function populateCourseFilter(attempts, allCourses) {
+    const select = $("#quizCourseFilter");
+    const currentVal = select.val();
+    
+    // Get unique courses from attempts using course_id
+    const coursesMap = new Map();
+    attempts.forEach(a => {
+        if (a.course_id && !coursesMap.has(a.course_id)) {
+            coursesMap.set(a.course_id, { id: a.course_id, title: a.course_title });
+        }
+    });
+    
+    // Also add all enrolled courses (even those without attempts)
+    allCourses.forEach(c => {
+        const cid = c.course_id || c.id;
+        if (cid && !coursesMap.has(cid)) {
+            coursesMap.set(cid, { id: cid, title: c.course_title || c.title });
+        }
+    });
+    
+    const courses = Array.from(coursesMap.values()).sort((a, b) => a.title.localeCompare(b.title));
+    
+    // Build options
+    let options = '<option value="all">All Courses</option>';
+    courses.forEach(c => {
+        options += `<option value="${c.id}">${c.title}</option>`;
+    });
+    
+    select.html(options);
+    if (currentVal && select.find(`option[value="${currentVal}"]`).length) {
+        select.val(currentVal);
+    }
+    
+    // Add change handler if not already bound
+    select.off('change').on('change', function() {
+        renderRecentAttempts(allQuizAttempts, allCourses);
+    });
+}
 
-    if (!points.length) {
-        $("#performanceTrendWrap").hide();
-        $("#noPerformanceData").show();
+function renderQuizHistoryChart(attempts) {
+    const canvas = document.getElementById("quizHistoryChart");
+    const chartContainer = canvas ? canvas.parentElement : null;
+    
+    if (!canvas || !chartContainer) return;
+    
+    // Remove any existing no-data message
+    const existingMsg = chartContainer.querySelector('.no-chart-data');
+    if (existingMsg) existingMsg.remove();
+    
+    // Destroy existing chart
+    if (quizHistoryChart) {
+        quizHistoryChart.destroy();
+        quizHistoryChart = null;
+    }
+    
+    // Validate attempts data
+    if (!attempts || !Array.isArray(attempts) || attempts.length === 0) {
+        canvas.style.display = 'none';
+        const msg = document.createElement('div');
+        msg.className = 'no-chart-data d-flex align-items-center justify-content-center text-muted';
+        msg.style.height = '100%';
+        msg.innerHTML = '<div class="text-center"><i class="fas fa-chart-line mb-2" style="font-size: 2rem; opacity: 0.5;"></i><br><small>No quiz attempts yet</small></div>';
+        chartContainer.appendChild(msg);
         return;
     }
-    $("#performanceTrendWrap").show();
-    $("#noPerformanceData").hide();
-
-    performanceChart = new Chart(canvas, {
-        type: "line",
+    
+    // Strictly filter and validate attempts - only include those with valid dates
+    const validAttempts = attempts.filter(a => {
+        if (!a || !a.date) return false;
+        const d = new Date(a.date);
+        // Check if date is valid and not in the future (allowing some slack for timezone issues)
+        if (isNaN(d.getTime())) return false;
+        const now = new Date();
+        const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+        if (d > oneYearFromNow) return false; // Reject dates too far in the future
+        return true;
+    });
+    
+    if (validAttempts.length === 0) {
+        canvas.style.display = 'none';
+        const msg = document.createElement('div');
+        msg.className = 'no-chart-data d-flex align-items-center justify-content-center text-muted';
+        msg.style.height = '100%';
+        msg.innerHTML = '<div class="text-center"><i class="fas fa-chart-line mb-2" style="font-size: 2rem; opacity: 0.5;"></i><br><small>No valid quiz data available</small></div>';
+        chartContainer.appendChild(msg);
+        return;
+    }
+    
+    // Sort by date (oldest first)
+    const sortedAttempts = [...validAttempts].sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    // STRICT LIMIT: Maximum 15 data points to prevent overcrowding
+    const maxPoints = 15;
+    const limitedAttempts = sortedAttempts.slice(-maxPoints);
+    
+    // Build chart data
+    const labels = limitedAttempts.map(a => {
+        const d = new Date(a.date);
+        return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+    });
+    const scores = limitedAttempts.map(a => Math.round(a.score || 0));
+    const pointColors = limitedAttempts.map(a => {
+        const passingScore = a.passing_score || 70;
+        const score = Math.round(a.score || 0);
+        return score >= passingScore ? '#22c55e' : '#ef4444';
+    });
+    
+    // Show canvas
+    canvas.style.display = 'block';
+    
+    // Create chart
+    quizHistoryChart = new Chart(canvas, {
+        type: 'line',
         data: {
-            labels: points.map(p => {
-                const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
-                const dateLabel = isNaN(d.getTime()) ? (p.date || "") : d.toLocaleDateString();
-                return `${dateLabel} - ${p.quiz || "Quiz"}`;
-            }),
+            labels: labels,
             datasets: [{
-                label: "Score %",
-                data: points.map(p => p.score),
-                borderColor: "#0d6efd",
-                backgroundColor: "rgba(13,110,253,0.12)",
-                pointRadius: 3,
+                label: 'Quiz Score',
+                data: scores,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
                 fill: true,
-                tension: 0.25
+                tension: 0.3,
+                pointBackgroundColor: pointColors,
+                pointBorderColor: pointColors,
+                pointRadius: 6,
+                pointHoverRadius: 8
             }]
         },
         options: {
+            responsive: true,
             maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    displayColors: false,
+                    callbacks: {
+                        title: function(context) {
+                            const idx = context[0].dataIndex;
+                            const attempt = limitedAttempts[idx];
+                            return attempt && attempt.quiz_title ? attempt.quiz_title : 'Quiz';
+                        },
+                        label: function(context) {
+                            const idx = context.dataIndex;
+                            const attempt = limitedAttempts[idx];
+                            if (!attempt) return [];
+                            const passingScore = attempt.passing_score || 70;
+                            const score = Math.round(attempt.score || 0);
+                            const isPassed = score >= passingScore;
+                            return [
+                                `Score: ${score}%`,
+                                `Pass Threshold: ${passingScore}%`,
+                                `Status: ${isPassed ? 'Passed ✓' : 'Failed ✗'}`,
+                                `Date: ${new Date(attempt.date).toLocaleDateString()}`
+                            ];
+                        }
+                    }
+                }
+            },
             scales: {
                 y: {
                     beginAtZero: true,
                     max: 100,
+                    title: { display: true, text: 'Score (%)' },
+                    ticks: { stepSize: 20 }
+                },
+                x: {
+                    title: { display: true, text: 'Date' },
                     ticks: {
-                        callback: function(v) { return v + "%"; }
-                    }
+                        maxRotation: 45,
+                        minRotation: 30,
+                        font: { size: 10 },
+                        maxTicksLimit: 8,
+                        autoSkip: true,
+                        autoSkipPadding: 10
+                    },
+                    grid: { display: false }
                 }
             }
         }
     });
 }
 
-function renderRecentAttempts(attempts) {
-    if (!attempts.length) {
-        $("#recentQuizAttempts").html('<div class="list-group-item text-muted px-0">No quiz attempts yet.</div>');
+// Render upcoming deadlines with course and lesson info
+function renderDeadlines(deadlines) {
+    const container = $("#deadlinesList");
+    
+    if (!deadlines || !deadlines.length) {
+        container.html('<div class="list-group-item text-muted"><i class="fas fa-check-circle text-success me-2"></i>No upcoming deadlines. You\'re all caught up!</div>');
         return;
     }
-
-    const html = attempts.map(a => {
-        const scoreClass = a.passed ? "text-success" : "text-danger";
-        const statusLabel = a.status === "TIMED_OUT" ? "Timed out" : (a.passed ? "Passed" : "Needs review");
-        const date = a.date ? new Date(a.date).toLocaleString() : "Unknown date";
+    
+    const html = deadlines.slice(0, 5).map(d => {
+        const daysLeft = d.days_left || 0;
+        const urgencyClass = daysLeft <= 1 ? 'text-danger' : (daysLeft <= 3 ? 'text-warning' : 'text-muted');
+        const urgencyIcon = daysLeft <= 1 ? 'fa-exclamation-circle' : (daysLeft <= 3 ? 'fa-clock' : 'fa-calendar');
+        const deadlineLabel = daysLeft === 0 ? 'Today' : (daysLeft === 1 ? 'Tomorrow' : `${daysLeft} days left`);
+        
         return `
-            <div class="list-group-item px-0">
-                <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <div class="fw-semibold">${a.quiz_title} <span class="badge text-bg-light text-dark border">Best: ${Math.round(a.best_score || a.score || 0)}%</span></div>
-                        <div class="small text-muted">${a.course_title} - ${date}</div>
+                        <div class="fw-semibold small">${d.course_title || 'Unknown Course'}</div>
+                        <div class="text-muted smaller">${d.lesson_title || d.quiz_title || 'Assessment'}</div>
                     </div>
-                    <div class="text-end">
-                        <div class="fw-bold ${scoreClass}">${Math.round(a.score || 0)}%</div>
-                        <div class="small text-muted">${statusLabel}</div>
+                    <div class="text-end ${urgencyClass}">
+                        <i class="fas ${urgencyIcon} me-1"></i>
+                        <small>${deadlineLabel}</small>
                     </div>
                 </div>
             </div>
         `;
     }).join("");
-    $("#recentQuizAttempts").html(html);
-}
-
-function renderDeadlines(deadlines) {
-    const card = $("#deadlinesCard");
-    if (!deadlines.length) {
-        card.addClass("d-none");
-        return;
-    }
-    card.removeClass("d-none");
-
-    const html = deadlines.map(d => `
-        <div class="list-group-item">
-            <div class="fw-semibold">${d.course_title}</div>
-            <div class="small text-muted">Due in ${d.days_left} day(s)</div>
-            <div class="small text-muted">Current progress: ${Math.round(d.current_progress || 0)}%</div>
-            ${d.expected_progress !== null && d.expected_progress !== undefined
-                ? `<div class="small text-muted">Expected progress by now: ${Math.round(d.expected_progress)}%</div>`
-                : ``}
-        </div>
-    `).join("");
-
-    $("#deadlinesList").html(html);
+    
+    container.html(html);
 }
 
 function renderNotifications(notifications) {
@@ -568,88 +873,168 @@ function renderNotifications(notifications) {
     }
 }
 
-function renderFocusStatus(focus, data) {
-    if (!focus || !focus.course_title) {
-        $("#focusStatusCard").html('<div class="text-muted">Your risk and engagement summary will appear once course activity is available.</div>');
-        return;
-    }
-
-    const riskClass = riskBadge(focus.risk_level);
-    const html = `
-        <div class="awareness-card p-3">
-            <div class="small text-primary fw-semibold mb-1">Your status right now</div>
-            <div class="d-flex align-items-center justify-content-between">
-                <div class="fw-semibold fs-5 mb-1">${focus.risk_level} risk in ${focus.course_title}</div>
-                <div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="showExplainability(encodeURIComponent(JSON.stringify(${JSON.stringify(focus)})))">Explain</button>
-                </div>
-            </div>
-            <div class="small text-muted">${focus.summary_message || "Keep working through your next lesson to stay on track."}</div>
-        </div>
-        <div class="row g-2 mt-2">
-            <div class="col-6">
-                <div class="awareness-stat">
-                    <div class="awareness-stat-label">Risk Score</div>
-                    <div class="awareness-stat-value">${Number(focus.risk_score_pct || 0).toFixed(1)}%</div>
-                    <span class="badge ${riskClass} mt-2">${focus.risk_level}</span>
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="awareness-stat">
-                    <div class="awareness-stat-label">Engagement</div>
-                    <div class="awareness-stat-value">${focus.engagement_level || (data.overall_engagement_level || "UNKNOWN")}</div>
-                    <div class="small text-muted mt-2">${Number(focus.engagement_score_pct || data.overall_engagement_score_pct || 0).toFixed(1)}%</div>
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="awareness-stat">
-                    <div class="awareness-stat-label">Last Activity</div>
-                    <div class="awareness-stat-value">${Number(focus.days_inactive_count || 0) === 0 ? "Today" : `${focus.days_inactive_count} day(s)`}</div>
-                    <div class="small text-muted mt-2">Away from your course workspace</div>
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="awareness-stat">
-                    <div class="awareness-stat-label">Assessments Waiting</div>
-                    <div class="awareness-stat-value">${focus.pending_assessments_count || 0}</div>
-                    <div class="small text-muted mt-2">${focus.failed_attempts_count || 0} attempt(s) need review</div>
-                </div>
-            </div>
-        </div>
-        <div class="small text-muted mt-3 mb-2">Main issue: ${focus.primary_factor || "Unknown"}</div>
-        <div class="border rounded p-2 bg-light-subtle small">
-            ${focus.next_lesson ? `Next lesson: <strong>${focus.next_lesson.title}</strong>` : `No pending lesson right now.`}
-        </div>
-        <div class="border rounded p-2 bg-warning-subtle small mt-2">
-            <strong>Best next step:</strong> ${focus.next_action || "Open your priority course and complete one lesson."}
-        </div>
-        <div class="mt-3 d-flex gap-2 flex-wrap">
-            <a href="${focus.course_url || '#'}" class="btn btn-sm btn-primary">Open Priority Course</a>
-            ${focus.next_lesson && focus.next_lesson.open_url ? `<a href="${focus.next_lesson.open_url}" class="btn btn-sm btn-outline-secondary">Open Next Lesson</a>` : ``}
-        </div>
-    `;
-    $("#focusStatusCard").html(html);
-}
-
 function renderNextSteps(data) {
-    let steps = data.next_steps || [];
-    if (!steps.length) {
-        const courses = data.courses || [];
-        if (!courses.length) {
-            steps = ["Enroll in a course to begin your learning journey."];
-        } else {
-            const pending = courses.find(c => c.next_lesson);
-            if (pending) steps.push(`Continue "${pending.next_lesson.title}" in ${pending.course_title}.`);
-            if (!(data.performance_trend || []).length) {
-                steps.push("Take a quiz to generate performance insights.");
-            }
-            if (!steps.length) {
-                steps.push("Keep your momentum: complete one lesson today.");
+    const courses = data.courses || [];
+    const focus = data.focus_status || {};
+    const attempts = data.recent_quiz_attempts || [];
+    const steps = [];
+    
+    if (!courses.length) {
+        steps.push("Enroll in a course to begin your learning journey.");
+    } else {
+        // Find failed quizzes and check attempts remaining
+        const failedQuizzes = attempts.filter(a => {
+            const passingScore = a.passing_score || 70;
+            const score = Math.round(a.score || 0);
+            return score < passingScore;
+        });
+        
+        if (failedQuizzes.length > 0) {
+            // Sort by worst score first, then by attempts remaining
+            failedQuizzes.sort((a, b) => {
+                const aAttemptsLeft = (a.max_attempts || 1) - (a.attempts_used || 0);
+                const bAttemptsLeft = (b.max_attempts || 1) - (b.attempts_used || 0);
+                // Prioritize: 1) has attempts left, 2) lower score
+                if (aAttemptsLeft > 0 && bAttemptsLeft === 0) return -1;
+                if (aAttemptsLeft === 0 && bAttemptsLeft > 0) return 1;
+                return (a.score || 0) - (b.score || 0);
+            });
+            
+            const worst = failedQuizzes[0];
+            const attemptsLeft = (worst.max_attempts || 1) - (worst.attempts_used || 0);
+            const lessonUrl = worst.lesson_url || `#`;
+            
+            if (attemptsLeft > 0) {
+                // Has attempts remaining - suggest retake after review
+                steps.push(`<strong>Priority:</strong> <a href="${lessonUrl}" class="text-decoration-none">📖 Review ${worst.lesson_title || worst.quiz_title}</a> then <a href="/dashboard/student/quizzes/${worst.quiz_id}/attempts?take=1" class="text-decoration-none">retake the quiz</a> (${attemptsLeft} attempt${attemptsLeft > 1 ? 's' : ''} remaining).`);
+            } else {
+                // No attempts left - suggest review only, ask teacher
+                steps.push(`<strong>Priority:</strong> <a href="${lessonUrl}" class="text-decoration-none">📖 Review ${worst.lesson_title || worst.quiz_title} materials</a>. No quiz attempts remaining. <a href="/dashboard/student/difficulty-report?course_id=${worst.course_id}" class="text-decoration-none">Ask your teacher for help</a>.`);
             }
         }
+        
+        // Find course with biggest progress gap
+        const coursesWithGap = courses.filter(c => c.progress_gap > 5).sort((a, b) => b.progress_gap - a.progress_gap);
+        if (coursesWithGap.length > 0) {
+            const behind = coursesWithGap[0];
+            const nextLessonUrl = behind.next_lesson?.open_url || `#`;
+            steps.push(`You're ${Math.round(behind.progress_gap)}% behind in <strong>${behind.course_title}</strong>. <a href="${nextLessonUrl}" class="text-decoration-none">Continue ${behind.next_lesson?.title || 'next lesson'}</a> to catch up.`);
+        }
+        
+        // Find high-priority next lesson from focus
+        if (focus.next_lesson && focus.course_title) {
+            const riskLevel = (focus.risk_level || '').toUpperCase();
+            const nextUrl = focus.next_lesson.open_url || '#';
+            if (riskLevel === 'HIGH' || riskLevel === 'CRITICAL') {
+                steps.push(`<strong>Urgent:</strong> <a href="${nextUrl}" class="text-decoration-none">Complete ${focus.next_lesson.title}</a> in ${focus.course_title} to reduce your risk level.`);
+            } else {
+                steps.push(`<a href="${nextUrl}" class="text-decoration-none">Continue ${focus.next_lesson.title}</a> in ${focus.course_title} to maintain your progress.`);
+            }
+        } else {
+            // Find first course with next lesson
+            const courseWithNext = courses.find(c => c.next_lesson);
+            if (courseWithNext) {
+                const nextUrl = courseWithNext.next_lesson?.open_url || '#';
+                steps.push(`<a href="${nextUrl}" class="text-decoration-none">Continue ${courseWithNext.next_lesson.title}</a> in ${courseWithNext.course_title}.`);
+            }
+        }
+        
+        // Pending assessments - use total from data for consistency
+        const totalPending = data.pending_assessments_total || 0;
+        if (totalPending > 0) {
+            steps.push(`You have <strong>${totalPending} pending assessment${totalPending > 1 ? 's' : ''}</strong>. <a href="/dashboard/student/pending-assessments" class="text-decoration-none">View pending assessments</a>.`);
+        }
+        
+        // Performance-based recommendation
+        const avgScore = attempts.length > 0 
+            ? attempts.reduce((sum, a) => sum + (a.score || 0), 0) / attempts.length 
+            : 0;
+        
+        if (avgScore > 0 && avgScore < 60 && !failedQuizzes.length) {
+            steps.push(`Your average quiz score is ${Math.round(avgScore)}%. <a href="/dashboard/student/my-courses" class="text-decoration-none">Review course materials</a> before attempting more quizzes.`);
+        } else if (avgScore >= 80) {
+            steps.push(`Great work! Your ${Math.round(avgScore)}% average shows strong understanding. Keep challenging yourself with upcoming lessons.`);
+        }
+        
+        // Engagement recommendation
+        if (focus.engagement_level === 'LOW') {
+            steps.push(`Your engagement is low. Log in daily and complete at least one lesson to stay on track.`);
+        }
+        
+        // Default fallback
+        if (steps.length === 0) {
+            steps.push("Keep your momentum: complete one lesson today.");
+        }
     }
+    
+    // Limit to top 4 most important steps
+    $("#nextSteps").html(steps.slice(0, 4).map(step => `<li class="mb-2">${step}</li>`).join(""));
+}
 
-    $("#nextSteps").html(steps.map(step => `<li class="mb-2">${step}</li>`).join(""));
+// Render current progress for each course
+function renderCurrentProgress(courses) {
+    const container = $("#courseGoalsList");
+    
+    if (!courses || !courses.length) {
+        container.html('<div class="list-group-item text-muted">Enroll in a course to see your progress.</div>');
+        return;
+    }
+    
+    // Deduplicate courses by course_id
+    const seenCourses = new Set();
+    const uniqueCourses = courses.filter(c => {
+        const cid = c.course_id || c.id;
+        if (seenCourses.has(cid)) return false;
+        seenCourses.add(cid);
+        return true;
+    });
+    
+    const html = uniqueCourses.slice(0, 4).map(c => {
+        const progress = Math.round(c.progress || 0);
+        const expected = c.expected_progress || 100;
+        const gap = c.progress_gap || 0;
+        const isBehind = gap > 5;
+        const statusClass = isBehind ? 'text-warning' : (progress >= 80 ? 'text-success' : 'text-muted');
+        const statusIcon = isBehind ? 'fa-exclamation-triangle' : (progress >= 80 ? 'fa-check-circle' : 'fa-circle');
+        
+        return `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="fw-semibold small">${c.course_title}</div>
+                    <span class="small ${statusClass}"><i class="fas ${statusIcon} me-1"></i>${progress}%</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar ${isBehind ? 'bg-warning' : 'bg-success'}" role="progressbar" style="width: ${progress}%"></div>
+                </div>
+                <div class="small text-muted mt-1">
+                    ${isBehind ? `<span class="text-warning">Behind by ${Math.round(gap)}%</span>` : 'On track'}
+                    ${c.pending_assessments_count > 0 ? ` · ${c.pending_assessments_count} pending` : ''}
+                </div>
+            </div>
+        `;
+    }).join("");
+    
+    container.html(html);
+}
+
+// REMOVED: renderPendingAssessments function - now using dedicated page only
+// Pending assessments are displayed on the dedicated Pending Assessments page
+// Dashboard shows only count in status bar
+
+// Sidebar badge updates
+function updateSidebarBadges(data) {
+    // Update pending assessments count
+    const pendingCount = data.pending_assessments_total || 0;
+    const pendingBadge = $("#sidebarPendingCount");
+    pendingBadge.text(pendingCount);
+    pendingBadge.toggleClass("d-none", pendingCount <= 0);
+    
+    // Update deadlines count
+    const deadlines = data.upcoming_deadlines || [];
+    const deadlineCount = deadlines.length;
+    const deadlineBadge = $("#sidebarDeadlineCount");
+    deadlineBadge.text(deadlineCount);
+    deadlineBadge.toggleClass("d-none", deadlineCount <= 0);
 }
 
 function reportDifficulty(courseId, lessonId = null) {

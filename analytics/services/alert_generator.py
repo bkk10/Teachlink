@@ -54,6 +54,7 @@ class AlertGenerator:
 
             # Keep unresolved alerts synchronized with the current enrollment state.
             cls._resolve_stale_enrollment_alerts(enrollment, risk_result)
+            cls._resolve_improved_condition_alerts(enrollment, risk_result)
             
             # Check different alert conditions
             dropout_alerts = cls._check_dropout_risk(enrollment, risk_result)
@@ -241,6 +242,111 @@ class AlertGenerator:
                 alert.intervention_outcome = f"Auto-resolved after risk update ({current_risk})"
                 alert.save(update_fields=['status', 'resolved_at', 'intervention_outcome'])
                 resolved += 1
+        return resolved
+    
+    @classmethod
+    def _resolve_improved_condition_alerts(cls, enrollment: Enrollment, risk_result: Dict[str, Any]) -> int:
+        """
+        Resolve alerts when specific conditions improve:
+        - Multiple Quiz Failures: resolve when < 3 failures in 30 days OR has recent passing attempts
+        - Student Disengaged: resolve when student has recent quiz activity (within 7 days)
+        - Behind Schedule: update message when progress increases
+        """
+        from assessments.models import QuizAttempt
+        
+        unresolved = Alert.objects.filter(
+            enrollment=enrollment,
+            status__in=[Alert.Status.ACTIVE, Alert.Status.ACKNOWLEDGED],
+        )
+        
+        now = timezone.now()
+        thirty_days_ago = now - timedelta(days=30)
+        seven_days_ago = now - timedelta(days=7)
+        
+        resolved = 0
+        
+        for alert in unresolved:
+            should_resolve = False
+            reason = None
+            update_message = False
+            new_message = None
+            
+            if alert.alert_type == Alert.AlertType.MULTIPLE_FAILURES:
+                # Check current failure count
+                failed_count = QuizAttempt.objects.filter(
+                    student=enrollment.student,
+                    quiz__lesson__module__course=enrollment.course,
+                    submitted_at__gte=thirty_days_ago,
+                    status=QuizAttempt.Status.COMPLETED,
+                    passed=False
+                ).count()
+                
+                # Check for recent passes
+                has_recent_pass = QuizAttempt.objects.filter(
+                    student=enrollment.student,
+                    quiz__lesson__module__course=enrollment.course,
+                    submitted_at__gte=thirty_days_ago,
+                    status=QuizAttempt.Status.COMPLETED,
+                    passed=True
+                ).exists()
+                
+                if failed_count < 3:
+                    should_resolve = True
+                    reason = f"Student now has only {failed_count} failures in last 30 days (below threshold)"
+                elif has_recent_pass:
+                    should_resolve = True
+                    reason = "Student has passed quizzes recently - showing improvement"
+                    
+            elif alert.alert_type == Alert.AlertType.DISENGAGEMENT:
+                # Check for recent activity (quiz attempts in last 7 days)
+                has_recent_activity = QuizAttempt.objects.filter(
+                    student=enrollment.student,
+                    quiz__lesson__module__course=enrollment.course,
+                    submitted_at__gte=seven_days_ago,
+                    status=QuizAttempt.Status.COMPLETED
+                ).exists()
+                
+                days_inactive = risk_result.get('components', {}).get('days_inactive', enrollment.days_since_last_activity)
+                
+                if has_recent_activity:
+                    should_resolve = True
+                    reason = "Student has recent quiz activity - no longer disengaged"
+                elif days_inactive < 3:
+                    should_resolve = True
+                    reason = f"Student has been active in last {days_inactive} days"
+                    
+            elif alert.alert_type == Alert.AlertType.BEHIND_SCHEDULE:
+                # Check if progress has improved enough to resolve the alert
+                current_progress = float(enrollment.progress_percentage or 0)
+                expected_progress = cls._get_expected_progress(enrollment)
+                progress_deficit = expected_progress - current_progress
+                
+                # Resolve if student caught up (deficit < 5%) or made significant progress (15%+ improvement)
+                progress_improvement = current_progress - float(alert.progress_percentage or 0)
+                
+                if progress_deficit < 5:  # Caught up to schedule
+                    should_resolve = True
+                    reason = f"Student caught up: now at {current_progress:.1f}% vs expected {expected_progress:.1f}%"
+                elif progress_improvement >= 15:  # Significant progress improvement
+                    should_resolve = True
+                    reason = f"Significant progress improvement: +{progress_improvement:.1f}% (from {alert.progress_percentage:.1f}% to {current_progress:.1f}%)"
+                elif current_progress > (alert.progress_percentage or 0):
+                    # Progress improved but not enough to resolve - update message
+                    progress_diff = current_progress - float(alert.progress_percentage or 0)
+                    update_message = True
+                    new_message = f"Progress improved from {alert.progress_percentage:.1f}% to {current_progress:.1f}% (+{progress_diff:.1f}%). Recent quiz passes indicate student is catching up."
+                    alert.progress_percentage = current_progress
+                    
+            if should_resolve:
+                alert.status = Alert.Status.RESOLVED
+                alert.resolved_at = now
+                alert.intervention_outcome = reason or "Auto-resolved after conditions improved"
+                alert.save(update_fields=['status', 'resolved_at', 'intervention_outcome', 'progress_percentage'])
+                resolved += 1
+            elif update_message and new_message:
+                alert.message = new_message
+                alert.save(update_fields=['message'])
+                
         return resolved
     
     @classmethod

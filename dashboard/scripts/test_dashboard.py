@@ -8,7 +8,7 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachlink.settings.development')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachly.settings.development')
 django.setup()
 
 from django.contrib.auth import get_user_model
@@ -30,7 +30,7 @@ def test_dashboard():
     print("\n1️⃣ Checking teacher dashboard...")
     
     # Try to find Mr. Ochieng specifically
-    teacher = User.objects.filter(email='mr_ochieng@teachlink.com').first()
+    teacher = User.objects.filter(email='mr_ochieng@teachly.com').first()
     
     # Fallback to any teacher
     if not teacher:
@@ -110,7 +110,7 @@ def test_dashboard():
     try:
         # Login request
         login_data = {
-            'email': 'mr_ochieng@teachlink.com',
+            'email': 'mr_ochieng@teachly.com',
             'password': 'Teacher123!'
         }
         

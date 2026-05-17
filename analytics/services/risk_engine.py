@@ -70,6 +70,7 @@ class RiskEngine:
     def calculate_student_risk(cls, enrollment_id: str) -> Optional[Dict[str, Any]]:
         """
         Calculate risk score and trend for a student enrollment.
+        Uses mastery-based approach: recent passing scores demonstrate competence.
         Returns a dict with score (0.0-1.0), level, trend and components.
         """
         try:
@@ -83,39 +84,49 @@ class RiskEngine:
 
         # Inputs
         progress_pct = cls._sanitize_percentage(enrollment.progress_percentage)
-        quiz_avg_pct = cls._sanitize_percentage(enrollment.average_quiz_score)
         days_inactive = max(0, int(enrollment.days_since_last_activity))
 
+        # Calculate quiz performance using mastery-based approach
+        quiz_avg_pct, recent_quiz_performance, has_recent_pass = cls._calculate_mastery_based_quiz_score(enrollment)
+        
         # Convert inputs to risk components (0.0-1.0, higher means worse)
         progress_risk = Decimal('1.0') - (progress_pct / Decimal('100'))
         quiz_risk = Decimal('1.0') - (quiz_avg_pct / Decimal('100'))
         inactivity_risk = cls._calculate_inactivity_risk(days_inactive)
-
-        # Support configurable weights to avoid hard-coded fixed formula in instructor usage.
+        
+        # Dynamic weight adjustment: if student has recent passes, reduce progress penalty
         weights = cls._resolve_weights(enrollment.course)
+        
+        # If student has recent quiz passes (demonstrated mastery), reduce progress risk weight
+        if has_recent_pass and quiz_avg_pct >= Decimal('60'):
+            # Student is showing competence - progress matters less than demonstrated ability
+            adjusted_weights = {
+                'progress': Decimal('0.25'),
+                'quiz': Decimal('0.50'),
+                'inactivity': Decimal('0.25'),
+            }
+        else:
+            adjusted_weights = weights
 
         risk_score = (
-            (progress_risk * weights['progress']) +
-            (quiz_risk * weights['quiz']) +
-            (inactivity_risk * weights['inactivity'])
+            (progress_risk * adjusted_weights['progress']) +
+            (quiz_risk * adjusted_weights['quiz']) +
+            (inactivity_risk * adjusted_weights['inactivity'])
         )
         risk_score = cls._clamp_decimal(risk_score, Decimal('0.0'), Decimal('1.0'))
 
         risk_level = cls._determine_risk_level(risk_score)
         risk_trend = cls._determine_risk_trend(previous_risk_score, risk_score)
         
-        # Calculate engagement more accurately
-        # Engagement = activity (recent access) + progress (completion) + quiz participation
-        # Recent activity: days since last access (0 days = 1.0, 14+ days = 0.0)
+        # Calculate engagement - boosted if recent quiz activity
         recency_score = max(Decimal('0.0'), Decimal('1.0') - (Decimal(days_inactive) / Decimal('14.0')))
-        
-        # Progress completion rate (0% = 0, 100% = 1)
         completion_rate = progress_pct / Decimal('100')
-        
-        # Quiz participation (0% = 0, 100% = 1)
         quiz_rate = quiz_avg_pct / Decimal('100')
         
-        # Combined engagement: 40% recency + 30% completion + 30% quiz participation
+        # If student took quizzes recently, boost engagement
+        if has_recent_pass:
+            recency_score = max(recency_score, Decimal('0.8'))
+        
         engagement_score = (
             recency_score * Decimal('0.4') +
             completion_rate * Decimal('0.3') +
@@ -126,8 +137,8 @@ class RiskEngine:
         
         result = {
             'enrollment_id': str(enrollment.id),
-            'student_id': str(enrollment.student.id),  # type: ignore
-            'student_name': enrollment.student.display_name,  # type: ignore
+            'student_id': str(enrollment.student.id),
+            'student_name': enrollment.student.display_name,
             'course_id': str(enrollment.course.id),
             'course_title': enrollment.course.title,
             'risk_score': float(risk_score),
@@ -135,26 +146,26 @@ class RiskEngine:
             'risk_level': risk_level,
             'risk_trend': risk_trend,
             'components': {
-                # Backward-compatible score names used elsewhere in the app
                 'performance': float(quiz_avg_pct),
                 'progress': float(progress_pct),
                 'engagement': round(engagement_pct, 1),
-                # Explicit new component for the upgraded engine
                 'inactivity': float(inactivity_risk),
                 'days_inactive': days_inactive,
+                'recent_quiz_performance': float(recent_quiz_performance) if recent_quiz_performance else None,
+                'has_recent_pass': has_recent_pass,
             },
             'contributing_factors': cls._identify_contributing_factors(
                 progress_pct=progress_pct,
                 quiz_avg_pct=quiz_avg_pct,
                 inactivity_risk=inactivity_risk,
                 days_inactive=days_inactive,
+                has_recent_pass=has_recent_pass,
             ),
             'calculated_at': timezone.now().isoformat()
         }
         
         cls._save_risk_history(enrollment, result)
         
-        # Persist latest snapshot
         enrollment.risk_score = risk_score
         enrollment.risk_level = risk_level
         enrollment.engagement_score = engagement_score
@@ -211,6 +222,80 @@ class RiskEngine:
                 Decimal('1.0'),
             )
         return Decimal('0.0')
+
+    @classmethod
+    def _calculate_mastery_based_quiz_score(cls, enrollment: Enrollment):
+        """
+        Calculate quiz score using mastery-based approach.
+        
+        Strategy:
+        - Look at attempts from last 30 days
+        - Use best score as indicator of demonstrated mastery
+        - Weight recent attempts more heavily
+        - If student has passed any quiz recently, boost the score
+        
+        Returns: (effective_score, recent_best_score, has_recent_pass)
+        """
+        from assessments.models import QuizAttempt
+        from django.db.models import Max, Avg
+        
+        now = timezone.now()
+        thirty_days_ago = now - timedelta(days=30)
+        seven_days_ago = now - timedelta(days=7)
+        
+        # Get all completed attempts for this enrollment's course
+        all_attempts = QuizAttempt.objects.filter(
+            student=enrollment.student,
+            quiz__lesson__module__course=enrollment.course,
+            status=QuizAttempt.Status.COMPLETED
+        ).order_by('-submitted_at')
+        
+        if not all_attempts.exists():
+            return Decimal('0'), None, False
+        
+        # Check for recent passing attempts (within 30 days)
+        recent_attempts = all_attempts.filter(submitted_at__gte=thirty_days_ago)
+        recent_best = recent_attempts.aggregate(max_score=Max('score_percentage'))['max_score']
+        has_recent_pass = recent_attempts.filter(passed=True).exists()
+        
+        # Calculate mastery score with heavy recency weighting
+        # Strategy: 70% weight on best recent score, 30% on historical average
+        if recent_best:
+            recent_best_pct = Decimal(str(recent_best))
+        else:
+            recent_best_pct = Decimal('0')
+        
+        # Historical average (all attempts)
+        historical_avg = all_attempts.aggregate(avg_score=Avg('score_percentage'))['avg_score']
+        if historical_avg:
+            historical_pct = Decimal(str(historical_avg))
+        else:
+            historical_pct = Decimal('0')
+        
+        # Special case: if student has recent passing scores, use best recent score
+        # with only light consideration of historical failures
+        if has_recent_pass and recent_best_pct >= Decimal('60'):
+            # Student has demonstrated mastery recently
+            # Use 85% best recent, 15% historical to avoid extreme swings
+            effective_score = (recent_best_pct * Decimal('0.85')) + (historical_pct * Decimal('0.15'))
+        elif recent_attempts.exists():
+            # Has recent attempts but no passes - use 60% recent, 40% historical
+            effective_score = (recent_best_pct * Decimal('0.60')) + (historical_pct * Decimal('0.40'))
+        else:
+            # No recent attempts - use historical with penalty for staleness
+            last_attempt = all_attempts.first()
+            if last_attempt and last_attempt.submitted_at:
+                days_since_last = (now - last_attempt.submitted_at).days
+                staleness_factor = max(Decimal('0.5'), Decimal('1.0') - (Decimal(days_since_last) / Decimal('60')))
+                effective_score = historical_pct * staleness_factor
+            else:
+                effective_score = historical_pct
+        
+        return (
+            cls._clamp_decimal(effective_score, Decimal('0'), Decimal('100')),
+            float(recent_best_pct) if recent_best else None,
+            has_recent_pass
+        )
     
     @classmethod
     def _determine_risk_level(cls, risk_score: Decimal) -> str:
@@ -240,22 +325,39 @@ class RiskEngine:
         quiz_avg_pct: Decimal,
         inactivity_risk: Decimal,
         days_inactive: int,
+        has_recent_pass: bool = False,
     ) -> List[Dict[str, Any]]:
         """Identify major drivers of current risk score."""
         factors = []
         
-        if progress_pct < Decimal('40'):
+        # Only flag low progress if student hasn't shown mastery recently
+        if progress_pct < Decimal('40') and not has_recent_pass:
             factors.append({
                 'factor': 'Low course progress',
                 'score': float(progress_pct),
                 'impact': 'high' if progress_pct < Decimal('25') else 'medium'
             })
+        elif progress_pct < Decimal('40') and has_recent_pass:
+            # Student has passed quizzes but low progress - suggest lesson completion
+            factors.append({
+                'factor': 'Low lesson completion (despite quiz mastery)',
+                'score': float(progress_pct),
+                'impact': 'medium'
+            })
         
-        if quiz_avg_pct < Decimal('50'):
+        # Quiz performance factor - reduced if recent passes exist
+        if quiz_avg_pct < Decimal('50') and not has_recent_pass:
             factors.append({
                 'factor': 'Low quiz performance',
                 'score': float(quiz_avg_pct),
                 'impact': 'high' if quiz_avg_pct < Decimal('35') else 'medium'
+            })
+        elif quiz_avg_pct < Decimal('50') and has_recent_pass:
+            # Student has recent passes but average is low due to old failures
+            factors.append({
+                'factor': 'Historical quiz failures (recent attempts show improvement)',
+                'score': float(quiz_avg_pct),
+                'impact': 'low'
             })
         
         if inactivity_risk >= Decimal('0.50'):
@@ -264,6 +366,14 @@ class RiskEngine:
                 'score': float(inactivity_risk),
                 'days_inactive': days_inactive,
                 'impact': 'high' if inactivity_risk >= Decimal('0.80') else 'medium'
+            })
+        
+        # Add positive factor if student has recent passes
+        if has_recent_pass and quiz_avg_pct >= Decimal('60'):
+            factors.append({
+                'factor': 'Recent quiz mastery demonstrated',
+                'score': float(quiz_avg_pct),
+                'impact': 'positive'
             })
         
         return factors

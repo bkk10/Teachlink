@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  web:
+    build: .
+    image: ghcr.io/${GITHUB_REPOSITORY}:latest
+    env_file: .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=teachly.settings.production
+    volumes:
+      - static_volume:/app/staticfiles
+    expose:
+      - "8000"
+    depends_on:
+      - db
+
+  nginx:
+    build:
+      context: ./deploy/nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+    volumes:
+      - static_volume:/app/staticfiles:ro
+
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+volumes:
+  postgres_data:
+  static_volume:

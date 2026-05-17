@@ -2,6 +2,16 @@
 
 {% block title %}Course Analytics{% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'dashboard_courses' %}">My Courses</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Analytics</li>
+    </ol>
+</nav>
+{% endblock %}
+
 {% block extra_css %}
 <style>
     .analytics-shell { max-width: 1500px; margin: 0 auto; }
@@ -140,12 +150,27 @@
                     <thead class="table-light">
                         <tr>
                             <th class="ps-3">Lesson</th>
-                            <th>Attempts <span class="text-muted" title="Completed quiz submissions for this lesson"><i class="fas fa-circle-info"></i></span></th>
-                            <th>Failures <span class="text-muted" title="Completed submissions below passing score"><i class="fas fa-circle-info"></i></span></th>
-                            <th>Failure Rate</th>
-                            <th>Accesses</th>
-                            <th>Difficulty</th>
-                            <th>Setup</th>
+                            <th>
+                                Attempts
+                                <span class="text-muted" title="Total completed quiz submissions for this lesson"><i class="fas fa-circle-info"></i></span>
+                            </th>
+                            <th>
+                                Failures
+                                <span class="text-muted" title="Completed submissions with score below passing threshold"><i class="fas fa-circle-info"></i></span>
+                            </th>
+                            <th>
+                                Failure Rate
+                                <span class="text-muted" title="Percentage of attempts that failed (below passing score)"><i class="fas fa-circle-info"></i></span>
+                            </th>
+                            <th>
+                                Accesses
+                                <span class="text-muted" title="Unique students who viewed this lesson content"><i class="fas fa-circle-info"></i></span>
+                            </th>
+                            <th>
+                                Difficulty
+                                <span class="text-muted" title="Calculated based on failure rate, attempt intensity, and student engagement"><i class="fas fa-circle-info"></i></span>
+                            </th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -179,10 +204,12 @@
                                 <td>
                                     {% if row.has_quiz %}
                                         <a href="{% url 'teacher_quiz_builder' row.quiz_id %}" class="btn btn-sm btn-outline-primary">
-                                            Set Questions
+                                            Manage Quiz
                                         </a>
                                     {% else %}
-                                        <span class="text-muted">Add quiz in workspace</span>
+                                        <a href="{% url 'dashboard_courses' %}?open_course={{ course.id }}&add_quiz_lesson={{ row.lesson_id }}" class="btn btn-sm btn-outline-secondary">
+                                            Add Quiz
+                                        </a>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -235,5 +262,8 @@
             </div>
         </div>
     </div>
+
+    {# Attendance Tracker Component #}
+    {% include "components/attendance_tracker.html" %}
 </div>
 {% endblock %}

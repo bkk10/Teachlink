@@ -4,7 +4,7 @@ Course Management Views
 import logging
 
 from rest_framework import generics, permissions, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication  # Make sure this is imported
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
@@ -392,10 +392,6 @@ class LessonViewSet(viewsets.ModelViewSet):
         if module_id:
             queryset = queryset.filter(module_id=module_id)
         
-        # Filter published for students
-        if self.request.user.is_authenticated and self.request.user.role == 'STUDENT':  # Changed
-            queryset = queryset.filter(is_published=True)
-        
         return queryset.order_by('order')
     
     def perform_create(self, serializer):
@@ -516,6 +512,77 @@ class LessonViewSet(viewsets.ModelViewSet):
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
         
         return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsStudent])
+    def track_interaction(self, request, pk=None):
+        """Track lesson view/interaction and update access counts"""
+        from analytics.models import LessonInteraction
+        lesson = self.get_object()
+        student = request.user
+        
+        # Check if student is enrolled
+        enrollment = Enrollment.objects.filter(
+            student=student,
+            course=lesson.module.course,
+            status=Enrollment.Status.ACTIVE
+        ).first()
+        
+        if not enrollment:
+            return Response(
+                {'error': 'Must be enrolled in course to track interactions'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get interaction type from request (default to VIEW)
+        interaction_type = request.data.get('interaction_type', 'VIEW')
+        if interaction_type not in ['VIEW', 'START', 'COMPLETE']:
+            interaction_type = 'VIEW'
+        
+        # Create interaction record
+        interaction = LessonInteraction.objects.create(
+            student=student,
+            lesson=lesson,
+            enrollment=enrollment,
+            interaction_type=interaction_type,
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+        
+        # Update lesson difficulty access count
+        from analytics.models import LessonDifficulty
+        difficulty, _ = LessonDifficulty.objects.get_or_create(
+            lesson=lesson,
+            defaults={
+                'total_views': 1,
+                'unique_students': 1
+            }
+        )
+        
+        # Increment total views
+        difficulty.total_views = models.F('total_views') + 1
+        
+        # Update unique students count
+        unique_views = LessonInteraction.objects.filter(
+            lesson=lesson,
+            interaction_type='VIEW'
+        ).values('student').distinct().count()
+        difficulty.unique_students = unique_views
+        difficulty.save()
+        
+        # Update enrollment last activity
+        enrollment.update_last_activity()
+        
+        # Recalculate risk
+        from analytics.services import RiskEngine, AlertGenerator
+        RiskEngine.calculate_student_risk(str(enrollment.id))
+        AlertGenerator.check_and_generate_alerts(enrollment_id=str(enrollment.id))
+        
+        return Response({
+            'message': 'Interaction tracked',
+            'interaction_id': str(interaction.id),
+            'type': interaction_type,
+            'timestamp': interaction.timestamp.isoformat()
+        })
 
 
 class EnrollmentViewSet(viewsets.ModelViewSet):
@@ -819,22 +886,51 @@ class RiskPredictionViewSet(viewsets.ViewSet):
         # Determine risk level
         if predicted_risk_score >= 0.7:
             predicted_level = 'HIGH'
-        elif predicted_risk_score >= 0.4:
+        elif predicted_risk_score >= 0.5:
             predicted_level = 'MEDIUM'
         else:
             predicted_level = 'LOW'
         
         return Response({
-            'enrollment_id': str(enrollment.id),
-            'student_name': enrollment.student.display_name,
-            'current_risk_score': float(enrollment.risk_score),
-            'current_risk_level': enrollment.risk_level,
-            'predicted_risk_score': float(predicted_risk_score),
+            'predicted_risk_score': round(predicted_risk_score, 3),
             'predicted_risk_level': predicted_level,
-            'improvement': float(enrollment.risk_score) - float(predicted_risk_score),
-            'simulation_parameters': {
-                'lessons_completed': hyp_lessons,
-                'quiz_score': hyp_quiz_score,
-                'days_inactive': hyp_inactivity,
-            }
+            'message': f'With {hyp_lessons} lessons completed, {hyp_quiz_score}% quiz score, and {hyp_inactivity} days inactive, the predicted risk level would be {predicted_level}.'
         })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_course_lessons(request, course_id):
+    """Get all lessons for a specific course"""
+    try:
+        course = Course.objects.get(id=course_id)
+        
+        # Check permission - only course teacher or enrolled students
+        if request.user.role == 'TEACHER' and course.teacher != request.user:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get all modules for this course
+        modules = Module.objects.filter(course=course).order_by('order')
+        
+        lessons_data = []
+        for module in modules:
+            # Get lessons for each module
+            lessons = Lesson.objects.filter(module=module).order_by('order')
+            for lesson in lessons:
+                lessons_data.append({
+                    'id': str(lesson.id),
+                    'title': lesson.title,
+                    'module': module.title,
+                    'module_order': module.order,
+                    'lesson_order': lesson.order,
+                    'is_published': lesson.is_published
+                })
+        
+        return Response({
+            'course_id': str(course.id),
+            'course_title': course.title,
+            'lessons': lessons_data
+        })
+        
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)

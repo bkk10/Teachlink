@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Create test quiz with questions and answers for TeachLink
+Create test quiz with questions and answers for Teachly
 Run: python manage.py shell < scripts/create_test_quiz.py
 """
 import django
@@ -9,7 +9,7 @@ import sys
 from decimal import Decimal
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachlink.settings.development')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachly.settings.development')
 django.setup()
 
 from django.contrib.auth import get_user_model

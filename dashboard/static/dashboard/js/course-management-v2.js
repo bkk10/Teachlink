@@ -28,9 +28,11 @@ function initEventListeners() {
     // Tab switching
     $('.tab-btn').click(function() {
         const tab = $(this).data('tab');
-        $('.tab-btn').removeClass('active text-blue-600 border-blue-600').addClass('text-gray-500');
-        $(this).addClass('active text-blue-600 border-blue-600').removeClass('text-gray-500');
-        
+        $('.tab-btn').removeClass('active text-blue-600 border-blue-600 bg-blue-50/50 font-semibold')
+                      .addClass('text-gray-500 border-transparent font-medium');
+        $(this).addClass('active text-blue-600 border-blue-600 bg-blue-50/50 font-semibold')
+               .removeClass('text-gray-500 border-transparent font-medium');
+
         $('.tab-content').addClass('hidden');
         $('#' + tab + 'Tab').removeClass('hidden');
     });
@@ -129,19 +131,11 @@ function initEventListeners() {
     $('#saveLessonBtn').click(() => saveLesson());
     
     $(document).off('click', '#addQuizBtn').on('click', '#addQuizBtn', function() { openAssessmentModal('quiz'); });
-    $(document).off('click', '#addAssignmentBtn').on('click', '#addAssignmentBtn', function() { openAssessmentModal('assignment'); });
+    $(document).off('click', '#addAssignmentBtn').on('click', '#addAssignmentBtn', function() { alert('Assignment workflow coming soon. Use Quiz for now.'); });
     $(document).off('click', '#addCatBtn').on('click', '#addCatBtn', function() { openAssessmentModal('cat'); });
     
     $(document).off('click', '#cancelAssessmentBtn').on('click', '#cancelAssessmentBtn', function() { closeAssessmentModal(); });
     $(document).off('click', '#saveAssessmentBtn').on('click', '#saveAssessmentBtn', function() { saveAssessment(); });
-    $(document).off('change', '#assessmentLesson').on('change', '#assessmentLesson', function() {
-        populateCatSourceQuizzes();
-        saveCatDraft();
-    });
-    $(document).off('input change', '#assessmentTitle, #assessmentDescription, #assessmentPassingScore, #assessmentQuestionText, #answerOption1, #answerOption2, #answerOption3, #answerOption4, #correctAnswerIndex, #catDurationMinutes, #catSourceQuiz, #catCopyQuestions')
-        .on('input change', '#assessmentTitle, #assessmentDescription, #assessmentPassingScore, #assessmentQuestionText, #answerOption1, #answerOption2, #answerOption3, #answerOption4, #correctAnswerIndex, #catDurationMinutes, #catSourceQuiz, #catCopyQuestions', function() {
-            saveCatDraft();
-        });
     
     $('#editCourseBtn').click(() => openCourseModal(currentCourseId));
     $('#publishCourseBtn').click(() => publishCourse());
@@ -212,11 +206,32 @@ function displayCourses() {
         const shortTitle = (course.title || 'Untitled Course').length > 44
             ? `${course.title.slice(0, 44)}...`
             : (course.title || 'Untitled Course');
-        const subtitle = `${status}${course.expected_hours ? ` | ${course.expected_hours} HRS` : ''}`;
+        const expectedHours = course.expected_hours ? parseFloat(course.expected_hours) : null;
+        const hoursText = expectedHours && !isNaN(expectedHours) ? ` | ${Math.round(expectedHours)} HRS` : '';
+        const subtitle = `${status}${hoursText}`;
         const preview = `${course.total_students || 0} students | ${course.total_lessons || 0} lessons`;
+        
+        // Health badge with risk border color and tooltip
+        let healthBadge = '';
+        let riskBorderClass = '';
+        const highRisk = parseInt(course.high_risk_count) || 0;
+        const mediumRisk = parseInt(course.medium_risk_count) || 0;
+        const lowRisk = parseInt(course.low_risk_count) || 0;
+        
+        if (highRisk > 0) {
+            healthBadge = `<span class="badge bg-danger text-white" style="font-size: 0.65rem; position: absolute; top: 8px; right: 8px; cursor: help;" title="${highRisk} student${highRisk !== 1 ? 's' : ''} at high risk (risk score >70%)${mediumRisk > 0 ? `, ${mediumRisk} at medium risk` : ''}${lowRisk > 0 ? `, ${lowRisk} at low risk` : ''}">${highRisk} high risk</span>`;
+            riskBorderClass = 'border-danger';
+        } else if (mediumRisk > 0) {
+            healthBadge = `<span class="badge bg-warning text-dark" style="font-size: 0.65rem; position: absolute; top: 8px; right: 8px; cursor: help;" title="${mediumRisk} student${mediumRisk !== 1 ? 's' : ''} at medium risk (risk score 30-70%)${lowRisk > 0 ? `, ${lowRisk} at low risk` : ''}">${mediumRisk} medium risk</span>`;
+            riskBorderClass = 'border-warning';
+        } else if (lowRisk > 0) {
+            healthBadge = `<span class="badge bg-success text-white" style="font-size: 0.65rem; position: absolute; top: 8px; right: 8px; cursor: help;" title="${lowRisk} student${lowRisk !== 1 ? 's' : ''} at low risk (risk score <30%)">${lowRisk} low risk</span>`;
+            riskBorderClass = 'border-success';
+        }
 
         html += `
-            <div class="course-card ${currentCourseId === course.id ? 'active' : ''}" data-id="${course.id}">
+            <div class="course-card ${currentCourseId === course.id ? 'active' : ''} ${riskBorderClass}" data-id="${course.id}" style="position: relative;">
+                ${healthBadge}
                 <div class="course-cover ${coverClass}"></div>
                 <div class="course-body">
                     <h4 class="course-title">${shortTitle}</h4>
@@ -224,10 +239,18 @@ function displayCourses() {
                     <div class="course-preview">${preview}</div>
                 </div>
                 <div class="course-footer">
-                    <div class="course-complete">${avgProgress}% complete</div>
-                    <button type="button" class="course-menu-btn analyze-course-btn" data-id="${course.id}" title="View analysis">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
+                    <div class="course-complete" title="Average progress percentage across all enrolled students">${avgProgress}% avg progress</div>
+                    <div class="dropdown">
+                        <button type="button" class="course-menu-btn" data-bs-toggle="dropdown" aria-expanded="false" onclick="event.stopPropagation();">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/dashboard/courses/?open_course=${course.id}"><i class="fas fa-layer-group me-2"></i>Manage Course</a></li>
+                            <li><a class="dropdown-item" href="/dashboard/teacher/courses/${course.id}/analytics/" target="_blank"><i class="fas fa-chart-line me-2"></i>Risk Overview</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/dashboard/courses/?open_course=${course.id}&add_lesson=1"><i class="fas fa-plus me-2"></i>Add Lesson</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         `;
@@ -239,12 +262,6 @@ function displayCourses() {
     $('.course-card').click(function() {
         const id = $(this).data('id');
         window.location.href = `/dashboard/courses/?open_course=${id}`;
-    });
-
-    $('.analyze-course-btn').click(function(e) {
-        e.stopPropagation();
-        const courseId = $(this).data('id');
-        window.open(`/dashboard/teacher/courses/${courseId}/analytics/`, '_blank');
     });
 
     if (preferredCourseId) {
@@ -382,32 +399,102 @@ function displayStudents(students) {
         return;
     }
     
-    let html = '';
+    // Build unified student table
+    let html = `
+        <div class="overflow-x-auto">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Student</th>
+                        <th>Progress</th>
+                        <th>Quiz Avg</th>
+                        <th>Risk</th>
+                        <th>Primary Driver</th>
+                        <th>Engagement</th>
+                        <th>Last Activity</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
     students.forEach(student => {
         const riskClass = {
-            'HIGH': 'risk-high',
-            'MEDIUM': 'risk-medium',
-            'LOW': 'risk-low'
-        }[student.risk_level] || '';
+            'HIGH': 'bg-danger',
+            'CRITICAL': 'bg-danger',
+            'MEDIUM': 'bg-warning',
+            'LOW': 'bg-success'
+        }[student.risk_level] || 'bg-secondary';
+        
+        const riskPercent = Math.round((student.risk_score || 0) * 100);
+        
+        // Determine primary driver
+        let primaryDriver = 'N/A';
+        let intervention = '';
+        const progress = parseFloat(student.progress_percentage || 0);
+        const quizAvg = parseFloat(student.average_quiz_score || 0);
+        const daysInactive = student.days_since_last_activity || 0;
+        
+        if (progress < 40) {
+            primaryDriver = 'Progress Deficit';
+            intervention = 'Agree on catch-up target';
+        } else if (quizAvg < 50) {
+            primaryDriver = 'Quiz Performance';
+            intervention = 'Recommend remediation';
+        } else if (daysInactive > 7) {
+            primaryDriver = 'Inactivity';
+            intervention = 'Send re-engagement message';
+        } else {
+            primaryDriver = 'On Track';
+            intervention = 'Continue monitoring';
+        }
+        
+        // Engagement level
+        let engagementLevel = 'Low';
+        let engagementClass = 'text-danger';
+        const engagementScore = parseFloat(student.engagement_score || 0);
+        if (engagementScore > 0.6) {
+            engagementLevel = 'High';
+            engagementClass = 'text-success';
+        } else if (engagementScore > 0.3) {
+            engagementLevel = 'Medium';
+            engagementClass = 'text-warning';
+        }
+        
+        const lastActivity = student.last_activity 
+            ? new Date(student.last_activity).toLocaleDateString()
+            : 'Never';
         
         html += `
-            <div class="student-card bg-white rounded-lg shadow p-4">
-                <div class="flex items-center justify-between mb-2">
-                    <h4 class="font-medium">${student.student_name}</h4>
-                    <span class="risk-badge ${riskClass}">${student.risk_level}</span>
-                </div>
-                <div class="text-sm text-gray-500 mb-2">Progress: ${student.progress_percentage}%</div>
-                <div class="w-full bg-gray-200 rounded-full h-2 mb-3">
-                    <div class="bg-blue-600 h-2 rounded-full" style="width: ${student.progress_percentage}%"></div>
-                </div>
-                <div class="flex justify-between text-xs text-gray-500">
-                    <span><i class="far fa-clock mr-1"></i>Last: ${new Date(student.last_activity).toLocaleDateString()}</span>
-                </div>
-            </div>
+            <tr>
+                <td>
+                    <div class="fw-semibold">${student.student_name}</div>
+                    <div class="small text-muted">${student.student_email || ''}</div>
+                </td>
+                <td>${parseFloat(student.progress_percentage || 0).toFixed(1)}%</td>
+                <td>${parseFloat(student.average_quiz_score || 0).toFixed(1)}%</td>
+                <td>
+                    <span class="badge ${riskClass}">${student.risk_level || 'UNKNOWN'}</span>
+                    <div class="small text-muted">${riskPercent}%</div>
+                </td>
+                <td>
+                    <div class="small">${primaryDriver}</div>
+                    <div class="small text-muted">${intervention}</div>
+                </td>
+                <td class="${engagementClass}">${engagementLevel}</td>
+                <td class="small">${lastActivity}</td>
+                <td>
+                    <a href="/dashboard/teacher/students/${student.student_id}/?course=${currentCourseId}" 
+                       class="btn btn-sm btn-outline-primary">View</a>
+                </td>
+            </tr>
         `;
     });
     
+    html += `</tbody></table></div>`;
+    
     $('#studentsList').html(html);
+    $('#studentsList').removeClass('grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4');
 }
 
 function loadModules(courseId) {
@@ -461,12 +548,23 @@ function loadDifficulty(courseId) {
     });
 }
 
+// Store difficulty data for filtering/sorting
+let difficultyDataCache = [];
+let currentDifficultySort = { column: null, asc: true };
+
 function displayDifficulty(rows) {
     if (!rows || rows.length === 0) {
-        $('#difficultyList').html('<tr><td colspan="5" class="text-muted text-center py-3">No lesson difficulty data yet.</td></tr>');
+        $('#difficultyList').html('<tr><td colspan="6" class="text-muted text-center py-3">No lesson difficulty data yet.</td></tr>');
         return;
     }
 
+    // Cache the data for filtering/sorting
+    difficultyDataCache = rows;
+    
+    renderDifficultyTable(rows);
+}
+
+function renderDifficultyTable(rows) {
     const badge = function(level) {
         const key = (level || 'UNKNOWN').toUpperCase();
         if (key === 'HIGH' || key === 'HARD' || key === 'VERY_HARD') {
@@ -486,18 +584,123 @@ function displayDifficulty(rows) {
         const attemptIntensity = Math.round((Number(row.attempt_intensity || 0) * 100) * 10) / 10;
         const accessCoverage = Math.round(Number(row.access_coverage_pct || 0) * 10) / 10;
         const accessCount = Number(row.access_count || 0);
+        const uniqueStudents = Number(row.unique_students || 0);
         return `
             <tr>
-                <td>${row.lesson_title || 'Untitled Lesson'}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">${row.lesson_title || 'Untitled Lesson'}</span>
+                        <a href="/dashboard/teacher/courses/${currentCourseId}/analytics/?lesson=${row.lesson_id}" 
+                           class="text-muted small" title="View detailed analytics for this lesson">
+                            <i class="fas fa-external-link-alt"></i> Details
+                        </a>
+                    </div>
+                </td>
                 <td>${badge(row.difficulty_level)}</td>
                 <td>${failureRate}%</td>
                 <td title="Average completed quiz attempts per student, normalized so 3 attempts per student = 100%.">${attemptIntensity}%</td>
-                <td title="Total students who accessed this lesson: ${accessCount}">${accessCoverage}%</td>
+                <td title="${uniqueStudents} of ${accessCount} enrolled students accessed this lesson">${accessCoverage}%</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="showLessonStudentsModal('${row.lesson_id}', '${row.lesson_title || 'Lesson'}')">
+                        <i class="fas fa-users me-1"></i> Students
+                    </button>
+                </td>
             </tr>
         `;
     }).join('');
 
     $('#difficultyList').html(html);
+}
+
+// Sort difficulty table by column
+function sortDifficultyTable(column) {
+    if (currentDifficultySort.column === column) {
+        currentDifficultySort.asc = !currentDifficultySort.asc;
+    } else {
+        currentDifficultySort = { column: column, asc: true };
+    }
+
+    const sorted = [...difficultyDataCache].sort((a, b) => {
+        let valA, valB;
+        switch (column) {
+            case 'lesson':
+                valA = a.lesson_title || '';
+                valB = b.lesson_title || '';
+                break;
+            case 'difficulty':
+                const order = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1, 'UNKNOWN': 0 };
+                valA = order[(a.difficulty_level || '').toUpperCase()] || 0;
+                valB = order[(b.difficulty_level || '').toUpperCase()] || 0;
+                break;
+            case 'failure':
+                valA = a.failure_rate || 0;
+                valB = b.failure_rate || 0;
+                break;
+            case 'intensity':
+                valA = a.attempt_intensity || 0;
+                valB = b.attempt_intensity || 0;
+                break;
+            case 'access':
+                valA = a.access_coverage_pct || 0;
+                valB = b.access_coverage_pct || 0;
+                break;
+            default:
+                return 0;
+        }
+        
+        if (valA < valB) return currentDifficultySort.asc ? -1 : 1;
+        if (valA > valB) return currentDifficultySort.asc ? 1 : -1;
+        return 0;
+    });
+
+    renderDifficultyTable(sorted);
+}
+
+// Show modal with students who accessed the lesson
+function showLessonStudentsModal(lessonId, lessonTitle) {
+    // Load students who accessed this lesson
+    $.ajax({
+        url: `/api/dashboard/lesson-students/?lesson_id=${lessonId}`,
+        method: 'GET',
+        success: function(data) {
+            const students = data.students || [];
+            let html = '';
+            
+            if (students.length === 0) {
+                html = '<p class="text-muted text-center">No students have accessed this lesson yet.</p>';
+            } else {
+                html = `
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Email</th>
+                                <th>Access Count</th>
+                                <th>Last Accessed</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${students.map(s => `
+                                <tr>
+                                    <td>${s.name}</td>
+                                    <td>${s.email}</td>
+                                    <td>${s.access_count}</td>
+                                    <td>${s.last_accessed || 'N/A'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            
+            $('#lessonStudentsModalTitle').text(`Students: ${lessonTitle}`);
+            $('#lessonStudentsList').html(html);
+            $('#lessonStudentsModal').removeClass('hidden');
+        },
+        error: function() {
+            $('#lessonStudentsList').html('<p class="text-danger text-center">Failed to load student data.</p>');
+        }
+    });
 }
 
 function displayModules(modules) {
@@ -519,8 +722,8 @@ function displayModules(modules) {
                         <span class="module-title-main">${module.title || 'Untitled Topic'}</span>
                     </div>
                     <div>
-                        <button class="add-lesson-btn btn btn-sm btn-outline-primary module-inline-action" data-module="${module.id}">
-                            <i class="fas fa-plus mr-1"></i>Add File
+                        <button class="add-lesson-btn btn btn-sm btn-outline-primary module-inline-action" data-module="${module.id}" title="Add a new lesson to this module">
+                            <i class="fas fa-plus mr-1"></i>Add Lesson
                         </button>
                     </div>
                 </div>
@@ -547,8 +750,18 @@ function displayModules(modules) {
                                     <span class="lesson-file-ext">${displayExt}</span>
                                 </div>
                             </div>
-                            <div class="lesson-meta">
-                                ${lesson.estimated_minutes || 0} min
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="lesson-meta">
+                                    ${lesson.estimated_minutes || 0} min
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" onclick="editLesson('${lesson.id}')" title="Edit lesson">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="deleteLesson('${lesson.id}')" title="Delete lesson">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -702,7 +915,7 @@ function displayAssessments(assessments) {
         $('#assessmentsList').html('<p class="text-gray-500 col-span-2 text-center py-8">No assessments yet</p>');
         return;
     }
-    
+
     let html = '';
     assessments.forEach(assessment => {
         const typeClass = {
@@ -710,35 +923,49 @@ function displayAssessments(assessments) {
             'assignment': 'type-assignment',
             'cat': 'type-cat'
         }[assessment.quiz_type?.toLowerCase()] || 'type-quiz';
+
+        const questionCount = parseInt(assessment.question_count || assessment.total_questions || 0);
+        const isExternal = assessment.quiz_type === 'EXTERNAL' || questionCount === 0;
+        const externalBadge = isExternal ? `<span class="badge bg-secondary ms-2" title="External/imported assessment - no online quiz">EXTERNAL</span>` : '';
         
+        // Build action buttons - hide for EXTERNAL quizzes
+        const actionButtons = isExternal ? '' : `
+            <div class="mt-3 d-flex gap-2">
+                <a class="btn btn-sm btn-primary" href="/dashboard/teacher/quizzes/${assessment.id}/builder/">
+                    <i class="fas fa-edit me-1"></i>Edit
+                </a>
+                <a class="btn btn-sm btn-outline-secondary" href="/dashboard/teacher/courses/${currentCourseId}/analytics/" target="_blank" rel="noopener" title="View lesson difficulty and performance analytics">
+                    <i class="fas fa-chart-bar me-1"></i>Lesson Difficulty
+                </a>
+            </div>
+        `;
+        
+        const importOnlyIndicator = isExternal ? `<div class="mt-2 text-xs text-warning"><i class="fas fa-info-circle me-1"></i>Import scores only - no online quiz</div>` : '';
+
         html += `
-            <div class="assessment-card">
+            <div class="assessment-card ${isExternal ? 'border-secondary bg-light' : ''}">
                 <div class="flex justify-between items-start mb-2">
-                    <h4 class="font-medium">${assessment.title}</h4>
+                    <h4 class="font-medium">${assessment.title}${externalBadge}</h4>
                     <span class="assessment-type ${typeClass}">${assessment.quiz_type || 'Quiz'}</span>
                 </div>
                 <p class="text-sm text-gray-600 mb-3">${assessment.description || 'No description'}</p>
                 <div class="text-xs text-gray-500 mb-2">
-                    <i class="fas fa-book-open mr-1"></i>${assessment.lesson_title || 'Lesson not set'}
+                    ${assessment.lesson_title || 'Lesson not set'}
                     <span class="mx-2">|</span>
-                    <i class="fas fa-list-ol mr-1"></i>${assessment.question_count || assessment.total_questions || 0} questions
+                    ${questionCount} questions
+                    <span class="mx-2">|</span>
+                    <span title="Number of student submissions"><i class="fas fa-users me-1"></i>${assessment.attempt_count || assessment.submission_count || 0} attempts</span>
                 </div>
                 <div class="flex justify-between text-xs text-gray-500">
-                    <span><i class="fas fa-clock mr-1"></i>${assessment.time_limit_minutes || 0} min</span>
-                    <span><i class="fas fa-star mr-1"></i>${assessment.passing_score || 0}% to pass</span>
+                    <span>${assessment.time_limit_minutes || 0} min</span>
+                    <span>${assessment.passing_score || 0}% to pass</span>
                 </div>
-                <div class="mt-3 d-flex gap-2">
-                    <a class="btn btn-sm btn-primary" href="/dashboard/teacher/quizzes/${assessment.id}/builder/">
-                        <i class="fas fa-pen-to-square me-1"></i>Set Questions
-                    </a>
-                    <a class="btn btn-sm btn-outline-secondary" href="/dashboard/teacher/courses/${currentCourseId}/analytics/" target="_blank" rel="noopener">
-                        <i class="fas fa-chart-line me-1"></i>Analytics
-                    </a>
-                </div>
+                ${actionButtons}
+                ${importOnlyIndicator}
             </div>
         `;
     });
-    
+
     $('#assessmentsList').html(html);
 }
 
@@ -850,6 +1077,9 @@ function openLessonModal(moduleId) {
 
 function closeLessonModal() {
     $('#lessonModal').addClass('hidden');
+    $('#lessonModal').removeData('editing-lesson-id');
+    $('#lessonForm')[0].reset();
+    $('#lessonFileName').text('No file selected');
 }
 
 function saveLesson() {
@@ -859,28 +1089,35 @@ function saveLesson() {
     formData.append('title', $('#lessonTitle').val());
     formData.append('content_type', type);
     formData.append('estimated_minutes', $('#lessonMinutes').val() || '15');
+    formData.append('is_published', 'true');
     
     if (type === 'VIDEO') {
         formData.append('video_url', $('#lessonUrl').val() || '');
     } else if (type === 'RESOURCE') {
         const file = $('#lessonFile')[0].files[0];
-        if (!file) {
-            alert('Please select a file to upload.');
-            return;
+        if (file) {
+            formData.append('resource_file', file);
         }
-        formData.append('resource_file', file);
     } else {
         formData.append('content_text', $('#lessonContent').val() || '');
     }
     
+    // Check if we're editing or creating
+    const editingLessonId = $('#lessonModal').data('editing-lesson-id');
+    const url = editingLessonId 
+        ? `/api/courses/lessons/${editingLessonId}/`
+        : '/api/courses/lessons/';
+    const method = editingLessonId ? 'PUT' : 'POST';
+    
     $.ajax({
-        url: '/api/courses/lessons/',
-        method: 'POST',
+        url: url,
+        method: method,
         processData: false,
         contentType: false,
         data: formData,
         success: function() {
             closeLessonModal();
+            $('#lessonModal').removeData('editing-lesson-id');
             loadModules(currentCourseId);
         },
         error: function(xhr) {
@@ -919,6 +1156,7 @@ function uploadQuickResource() {
     formData.append('content_type', 'RESOURCE');
     formData.append('estimated_minutes', minutes);
     formData.append('resource_file', file);
+    formData.append('is_published', 'true');  // Publish immediately so students can see it
 
     $.ajax({
         url: '/api/courses/lessons/',
@@ -943,21 +1181,18 @@ function uploadQuickResource() {
 
 function openAssessmentModal(type) {
     $('#assessmentType').val(type);
-    $('#assessmentModalTitle').text('Add ' + type.charAt(0).toUpperCase() + type.slice(1));
+    $('#assessmentModalTitle').text('Add Quiz');
     $('#assessmentForm')[0].reset();
+    $('#assessmentTimeLimit').val('30');
+    $('#assessmentPassingScore').val('70');
     populateAssessmentLessons();
-    toggleAssessmentMode(type);
-    populateCatSourceQuizzes();
-    if (type === 'cat') {
-        loadCatDraft();
-    }
     $('#assessmentModal').removeClass('hidden');
     $('#assessmentTitle').trigger('focus');
 }
 
 function closeAssessmentModal() {
     $('#assessmentModal').addClass('hidden');
-    $('#saveAssessmentBtn').prop('disabled', false).text('Save');
+    $('#saveAssessmentBtn').prop('disabled', false).text('Create Quiz');
 }
 
 function populateAssessmentLessons() {
@@ -980,338 +1215,91 @@ function populateAssessmentLessons() {
     $('#assessmentLesson').html(html);
 }
 
-function toggleAssessmentMode(type) {
-    if (type === 'quiz') {
-        $('#catWizard').addClass('hidden');
-        $('#assessmentNonQuizHint').addClass('hidden');
-        $('#assessmentQuestionText, #answerOption1, #answerOption2, #answerOption3, #answerOption4, #correctAnswerIndex').prop('disabled', false);
-        $('#saveAssessmentBtn').text('Save Quiz');
-    } else if (type === 'cat') {
-        $('#catWizard').removeClass('hidden');
-        $('#assessmentNonQuizHint').addClass('hidden');
-        $('#assessmentQuestionText, #answerOption1, #answerOption2, #answerOption3, #answerOption4, #correctAnswerIndex').prop('disabled', false);
-        $('#saveAssessmentBtn').text('Save CAT');
-    } else {
-        $('#catWizard').addClass('hidden');
-        $('#assessmentNonQuizHint').removeClass('hidden');
-        $('#assessmentQuestionText, #answerOption1, #answerOption2, #answerOption3, #answerOption4, #correctAnswerIndex').prop('disabled', true);
-        $('#saveAssessmentBtn').text('Save');
-    }
-}
-
 function saveAssessment() {
-    const type = $('#assessmentType').val();
-    if (type !== 'quiz' && type !== 'cat') {
-        alert('Assignment workflow is not configured yet. Use Quiz or CAT.');
-        return;
-    }
-    const isCat = type === 'cat';
-
     const lessonId = $('#assessmentLesson').val();
     if (!lessonId) {
         alert('Select a lesson for this quiz.');
         return;
     }
 
+    const title = ($('#assessmentTitle').val() || '').trim();
+    if (!title) {
+        alert('Quiz title is required.');
+        $('#assessmentTitle').focus();
+        return;
+    }
+
     const quizPayload = {
         lesson: lessonId,
-        title: ($('#assessmentTitle').val() || '').trim(),
+        title: title,
         description: ($('#assessmentDescription').val() || '').trim(),
         quiz_type: 'MCQ',
         passing_score: Number($('#assessmentPassingScore').val() || 70),
-        time_limit_minutes: isCat ? Number($('#catDurationMinutes').val() || 30) : 0,
-        max_attempts: isCat ? 1 : 3,
-        is_published: true
+        time_limit_minutes: Number($('#assessmentTimeLimit').val() || 30),
+        max_attempts: 3,
+        is_published: false
     };
 
-    const questionText = ($('#assessmentQuestionText').val() || '').trim();
-    const options = [
-        ($('#answerOption1').val() || '').trim(),
-        ($('#answerOption2').val() || '').trim(),
-        ($('#answerOption3').val() || '').trim(),
-        ($('#answerOption4').val() || '').trim()
-    ];
-    const optionEntries = options
-        .map((text, idx) => ({ idx: idx, text: text }))
-        .filter(entry => !!entry.text);
-
-    if (!quizPayload.title) {
-        alert('Quiz title is required.');
-        return;
-    }
-
-    if (questionText && optionEntries.length < 2) {
-        alert('Provide at least two options for the question.');
-        return;
-    }
-
-    const correctIndex = Number($('#correctAnswerIndex').val() || 1) - 1;
-    const selectedCorrectOriginal = optionEntries.some(entry => entry.idx === correctIndex)
-        ? correctIndex
-        : optionEntries[0].idx;
-    const catSourceQuizId = isCat ? ($('#catSourceQuiz').val() || '') : '';
-    const catCopyQuestions = isCat && $('#catCopyQuestions').is(':checked') && !!catSourceQuizId;
-
     const saveBtn = $('#saveAssessmentBtn');
-    const originalBtnText = saveBtn.text();
-    saveBtn.prop('disabled', true).text('Saving...');
+    saveBtn.prop('disabled', true).text('Creating...');
 
-    upsertQuizForLesson(lessonId, quizPayload, function(quiz) {
-        const tasks = [];
-
-        if (catCopyQuestions && catSourceQuizId && String(catSourceQuizId) !== String(quiz.id)) {
-            tasks.push(function(next) {
-                copyQuestionsFromQuiz(catSourceQuizId, quiz.id, function(err) {
-                    next(err);
-                });
-            });
-        }
-
-        if (questionText && optionEntries.length >= 2) {
-            tasks.push(function(next) {
-                createQuestionWithAnswers(
-                    quiz.id,
-                    questionText,
-                    optionEntries.map((entry, visualOrder) => ({
-                        text: entry.text,
-                        is_correct: entry.idx === selectedCorrectOriginal,
-                        order: visualOrder + 1
-                    })),
-                    function(err) { next(err); }
-                );
-            });
-        }
-
-        runSequential(tasks, function(err) {
-            saveBtn.prop('disabled', false).text(originalBtnText);
-            if (err) {
-                alert(err);
-            } else {
-                if (isCat) clearCatDraft();
-                alert(isCat ? 'CAT saved successfully.' : 'Assessment saved successfully.');
-            }
-            closeAssessmentModal();
-            loadAssessments(currentCourseId);
-        });
-    }, function(xhr) {
-        saveBtn.prop('disabled', false).text(originalBtnText);
-        console.error('Failed to create/update quiz', xhr.status, xhr.responseText);
-        if (handleAuthError(xhr)) return;
-        alert(readApiError(xhr, 'Failed to save assessment. Check lesson selection and form values.'));
-    });
-}
-
-function upsertQuizForLesson(lessonId, quizPayload, onSuccess, onError) {
+    // First check if a quiz already exists for this lesson
     $.ajax({
         url: `/api/assessments/quizzes/?lesson=${lessonId}`,
         method: 'GET',
         success: function(listData) {
             const quizzes = Array.isArray(listData) ? listData : (listData.results || []);
             if (quizzes.length > 0) {
+                // Update existing quiz
                 const existingId = quizzes[0].id;
                 $.ajax({
                     url: `/api/assessments/quizzes/${existingId}/`,
                     method: 'PATCH',
                     contentType: 'application/json',
-                    data: JSON.stringify({
-                        title: quizPayload.title,
-                        description: quizPayload.description,
-                        passing_score: quizPayload.passing_score,
-                        quiz_type: 'MCQ',
-                        is_published: true
-                    }),
-                    success: onSuccess,
-                    error: onError
+                    data: JSON.stringify(quizPayload),
+                    success: function(quiz) {
+                        saveBtn.prop('disabled', false).text('Create Quiz');
+                        closeAssessmentModal();
+                        // Redirect to quiz builder to add questions
+                        window.location.href = `/dashboard/teacher/quizzes/${quiz.id}/builder/`;
+                    },
+                    error: function(xhr) {
+                        saveBtn.prop('disabled', false).text('Create Quiz');
+                        console.error('Failed to update quiz', xhr.status, xhr.responseText);
+                        if (handleAuthError(xhr)) return;
+                        alert('Failed to update quiz. Please try again.');
+                    }
                 });
                 return;
             }
 
+            // Create new quiz
             $.ajax({
                 url: '/api/assessments/quizzes/',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(quizPayload),
-                success: onSuccess,
-                error: onError
-            });
-        },
-        error: onError
-    });
-}
-
-function createQuestionWithAnswers(quizId, questionText, answers, done) {
-    const questionPayload = {
-        quiz: quizId,
-        question_type: 'MCQ',
-        text: questionText,
-        points: 1
-    };
-
-    $.ajax({
-        url: '/api/assessments/questions/',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(questionPayload),
-        success: function(question) {
-            if (!answers || !answers.length) {
-                done(null);
-                return;
-            }
-            let processed = 0;
-            let failed = false;
-            answers.forEach(answer => {
-                $.ajax({
-                    url: '/api/assessments/answers/',
-                    method: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({
-                        question: question.id,
-                        text: answer.text,
-                        is_correct: !!answer.is_correct,
-                        order: answer.order || 1
-                    }),
-                    error: function(xhr) {
-                        failed = true;
-                        console.error('Failed to create answer', xhr.status, xhr.responseText);
-                    },
-                    complete: function() {
-                        processed += 1;
-                        if (processed === answers.length) {
-                            done(failed ? 'Assessment saved, but some answers failed to save.' : null);
-                        }
-                    }
-                });
+                success: function(quiz) {
+                    saveBtn.prop('disabled', false).text('Create Quiz');
+                    closeAssessmentModal();
+                    // Redirect to quiz builder to add questions
+                    window.location.href = `/dashboard/teacher/quizzes/${quiz.id}/builder/`;
+                },
+                error: function(xhr) {
+                    saveBtn.prop('disabled', false).text('Create Quiz');
+                    console.error('Failed to create quiz', xhr.status, xhr.responseText);
+                    if (handleAuthError(xhr)) return;
+                    alert('Failed to create quiz. Please try again.');
+                }
             });
         },
         error: function(xhr) {
-            console.error('Failed to create question', xhr.status, xhr.responseText);
-            done(readApiError(xhr, 'Assessment saved, but question creation failed.'));
+            saveBtn.prop('disabled', false).text('Create Quiz');
+            console.error('Failed to check existing quizzes', xhr.status, xhr.responseText);
+            if (handleAuthError(xhr)) return;
+            alert('Failed to check for existing quizzes. Please try again.');
         }
     });
-}
-
-function copyQuestionsFromQuiz(sourceQuizId, targetQuizId, done) {
-    $.ajax({
-        url: `/api/assessments/quizzes/${sourceQuizId}/`,
-        method: 'GET',
-        success: function(sourceQuiz) {
-            const sourceQuestions = sourceQuiz && sourceQuiz.questions ? sourceQuiz.questions : [];
-            if (!sourceQuestions.length) {
-                done(null);
-                return;
-            }
-
-            const tasks = sourceQuestions.map(sourceQuestion => function(next) {
-                const sourceAnswers = (sourceQuestion.answers || []).map((answer, idx) => ({
-                    text: answer.text,
-                    is_correct: !!answer.is_correct,
-                    order: Number(answer.order || idx + 1)
-                }));
-                createQuestionWithAnswers(
-                    targetQuizId,
-                    sourceQuestion.text || 'Copied Question',
-                    sourceAnswers,
-                    function(err) { next(err); }
-                );
-            });
-
-            runSequential(tasks, function(err) {
-                done(err);
-            });
-        },
-        error: function(xhr) {
-            console.error('Failed to fetch source quiz', xhr.status, xhr.responseText);
-            done(readApiError(xhr, 'CAT saved, but failed to copy questions from source quiz.'));
-        }
-    });
-}
-
-function runSequential(tasks, done) {
-    if (!tasks || !tasks.length) {
-        done(null);
-        return;
-    }
-    let index = 0;
-    const next = function(err) {
-        if (err) {
-            done(err);
-            return;
-        }
-        if (index >= tasks.length) {
-            done(null);
-            return;
-        }
-        const task = tasks[index];
-        index += 1;
-        task(next);
-    };
-    next(null);
-}
-
-function getCatDraftKey() {
-    return `teachlink_cat_draft_${currentCourseId || 'none'}`;
-}
-
-function saveCatDraft() {
-    if ($('#assessmentType').val() !== 'cat') return;
-    const draft = {
-        lesson: $('#assessmentLesson').val() || '',
-        title: ($('#assessmentTitle').val() || '').trim(),
-        description: ($('#assessmentDescription').val() || '').trim(),
-        passingScore: $('#assessmentPassingScore').val() || '70',
-        duration: $('#catDurationMinutes').val() || '30',
-        sourceQuiz: $('#catSourceQuiz').val() || '',
-        copyQuestions: $('#catCopyQuestions').is(':checked'),
-        questionText: ($('#assessmentQuestionText').val() || '').trim(),
-        option1: ($('#answerOption1').val() || '').trim(),
-        option2: ($('#answerOption2').val() || '').trim(),
-        option3: ($('#answerOption3').val() || '').trim(),
-        option4: ($('#answerOption4').val() || '').trim(),
-        correctIndex: $('#correctAnswerIndex').val() || '1'
-    };
-    try {
-        window.localStorage.setItem(getCatDraftKey(), JSON.stringify(draft));
-    } catch (e) {}
-}
-
-function loadCatDraft() {
-    try {
-        const raw = window.localStorage.getItem(getCatDraftKey());
-        if (!raw) return;
-        const draft = JSON.parse(raw);
-        if (draft.lesson) $('#assessmentLesson').val(draft.lesson);
-        if (draft.title) $('#assessmentTitle').val(draft.title);
-        if (draft.description) $('#assessmentDescription').val(draft.description);
-        if (draft.passingScore) $('#assessmentPassingScore').val(draft.passingScore);
-        if (draft.duration) $('#catDurationMinutes').val(draft.duration);
-        populateCatSourceQuizzes();
-        if (draft.sourceQuiz) $('#catSourceQuiz').val(draft.sourceQuiz);
-        $('#catCopyQuestions').prop('checked', !!draft.copyQuestions);
-        if (draft.questionText) $('#assessmentQuestionText').val(draft.questionText);
-        if (draft.option1) $('#answerOption1').val(draft.option1);
-        if (draft.option2) $('#answerOption2').val(draft.option2);
-        if (draft.option3) $('#answerOption3').val(draft.option3);
-        if (draft.option4) $('#answerOption4').val(draft.option4);
-        if (draft.correctIndex) $('#correctAnswerIndex').val(draft.correctIndex);
-    } catch (e) {}
-}
-
-function clearCatDraft() {
-    try {
-        window.localStorage.removeItem(getCatDraftKey());
-    } catch (e) {}
-}
-
-function populateCatSourceQuizzes() {
-    const select = $('#catSourceQuiz');
-    if (!select.length) return;
-    const selectedLessonId = $('#assessmentLesson').val();
-    let html = '<option value="">Start from scratch</option>';
-    (currentAssessments || []).forEach(quiz => {
-        if (selectedLessonId && String(quiz.lesson) === String(selectedLessonId)) return;
-        html += `<option value="${quiz.id}">${quiz.title || 'Untitled Quiz'} (${quiz.lesson_title || 'No lesson'})</option>`;
-    });
-    select.html(html);
 }
 
 function readApiError(xhr, fallbackMessage) {
@@ -1328,4 +1316,73 @@ function readApiError(xhr, fallbackMessage) {
     } catch (err) {
         return fallbackMessage;
     }
+}
+
+function editLesson(lessonId) {
+    // Find the lesson in current modules
+    let lesson = null;
+    let module = null;
+    for (const m of currentModules) {
+        if (m.lessons) {
+            const found = m.lessons.find(l => String(l.id) === String(lessonId));
+            if (found) {
+                lesson = found;
+                module = m;
+                break;
+            }
+        }
+    }
+    
+    if (!lesson) {
+        alert('Lesson not found');
+        return;
+    }
+    
+    // Populate and open the edit modal
+    $('#lessonModuleId').val(module.id);
+    $('#lessonTitle').val(lesson.title || '');
+    $('#lessonType').val(lesson.content_type || 'TEXT');
+    $('#lessonMinutes').val(lesson.estimated_minutes || 15);
+    $('#lessonContent').val(lesson.content_text || '');
+    $('#lessonUrl').val(lesson.video_url || lesson.external_url || '');
+    $('#lessonFileName').text(lesson.resource_file ? 'Current file: ' + lesson.resource_file.split('/').pop() : 'No file selected');
+    
+    // Show/hide appropriate fields based on content type
+    const type = lesson.content_type || 'TEXT';
+    if (type === 'VIDEO') {
+        $('#contentField').hide();
+        $('#urlField').show();
+        $('#fileField').hide();
+    } else if (type === 'RESOURCE') {
+        $('#contentField').hide();
+        $('#urlField').hide();
+        $('#fileField').show();
+    } else {
+        $('#contentField').show();
+        $('#urlField').hide();
+        $('#fileField').hide();
+    }
+    
+    // Store the lesson ID for the update
+    $('#lessonModal').data('editing-lesson-id', lessonId);
+    $('#lessonModal').removeClass('hidden');
+}
+
+function deleteLesson(lessonId) {
+    if (!confirm('Are you sure you want to delete this lesson? This action cannot be undone.')) {
+        return;
+    }
+    
+    $.ajax({
+        url: `/api/courses/lessons/${lessonId}/`,
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': getCSRFToken() },
+        success: function() {
+            loadModules(currentCourseId);
+        },
+        error: function(xhr) {
+            console.error('Failed to delete lesson', xhr.status, xhr.responseText);
+            alert('Failed to delete lesson. Please try again.');
+        }
+    });
 }

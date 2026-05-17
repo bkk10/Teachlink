@@ -1,5 +1,4 @@
-{# AI Quiz Suggestion Modal Component #}
-{# Phase 2: AI Quiz Generation #}
+{# AI Quiz Suggestion Modal Component - Phase 2 #}
 {# Usage: {% include "components/ai_quiz_suggestion.html" with lesson=lesson_obj %} #}
 
 <style>
@@ -309,17 +308,23 @@
     }
 </style>
 
-{# Modal Trigger Button #}
+{# Modal Trigger Button - disabled if no lesson content #}
+{% if lesson.content_html %}
 <button id="ai-quiz-btn" class="btn btn-primary" style="display: flex; align-items: center; gap: 8px;">
-    ✨ Suggest Quiz Questions
+    Suggest Quiz Questions
 </button>
+{% else %}
+<button id="ai-quiz-btn-disabled" class="btn btn-secondary" style="display: flex; align-items: center; gap: 8px; opacity: 0.6; cursor: not-allowed;" title="Add lesson content first to enable AI suggestions">
+    Suggest Quiz Questions (Add Content First)
+</button>
+{% endif %}
 
 {# Modal #}
 <div id="ai-quiz-modal-backdrop" class="modal-backdrop">
     <div class="ai-quiz-modal">
         <div class="modal-header">
             <div class="modal-title">
-                ✨ AI Quiz Generator
+                AI Quiz Generator
             </div>
             <button class="modal-close" id="modal-close-btn">×</button>
         </div>

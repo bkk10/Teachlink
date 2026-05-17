@@ -3,6 +3,7 @@ from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
 from . import debug_views
+from . import import_views
 
 urlpatterns = [
     # Auth URLs
@@ -48,6 +49,7 @@ urlpatterns = [
     path('teacher/students/', views.teacher_students, name='teacher_students'),
     path('teacher/payments/', views.teacher_payments, name='teacher_payments'),
     path('teacher/students/<uuid:student_id>/<uuid:course_id>/', views.risk_detail, name='teacher_student_detail'),
+    path('teacher/import-history/', import_views.csv_import_history, name='csv_import_history'),
     path('student/enroll-key/', views.student_enroll_by_key, name='student_enroll_by_key'),
     path('student/', views.student_dashboard, name='student_dashboard'),
     path('student/courses/<uuid:course_id>/quizzes/', views.student_course_quizzes, name='student_course_quizzes'),

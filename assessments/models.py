@@ -1,5 +1,5 @@
 """
-Assessment and Quiz Management Models for TeachLink
+Assessment and Quiz Management Models for Teachly
 - Quiz creation and management
 - Question banks
 - Student attempts and scoring
@@ -24,6 +24,7 @@ class Quiz(models.Model):
         MULTIPLE_CHOICE = 'MCQ', 'Multiple Choice'
         TRUE_FALSE = 'TF', 'True/False'
         MIXED = 'MIXED', 'Mixed Questions'
+        EXTERNAL = 'EXTERNAL', 'External/Imported'  # For CSV-imported assessments with no questions
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
@@ -422,6 +423,17 @@ class QuizAttempt(models.Model):
                 self.status = self.Status.TIMED_OUT
                 self.save(update_fields=['status'])
                 raise ValueError(f"Time limit exceeded. Elapsed: {elapsed:.1f} minutes, Limit: {self.quiz.time_limit_minutes} minutes")
+        
+        # Enforce minimum time (10 seconds per question)
+        if self.started_at:
+            elapsed_seconds = (timezone.now() - self.started_at).total_seconds()
+            min_time_seconds = self.quiz.total_questions * 10  # 10 seconds per question
+            if elapsed_seconds < min_time_seconds:
+                raise ValueError(
+                    f"Submission too fast. Please spend at least {min_time_seconds} seconds "
+                    f"({min_time_seconds // 60}m {min_time_seconds % 60}s) on this quiz. "
+                    f"Elapsed: {int(elapsed_seconds)}s."
+                )
             
         if responses:
             self.responses = responses
@@ -485,8 +497,10 @@ class QuizAttempt(models.Model):
                 continue
     
     def update_enrollment_performance(self):
-        """Update student's enrollment average quiz score"""
+        """Update student's enrollment average quiz score with Recency weighting"""
         from courses.models import Enrollment
+        from django.utils import timezone
+        from datetime import timedelta
         
         try:
             enrollment = Enrollment.objects.get(
@@ -494,18 +508,42 @@ class QuizAttempt(models.Model):
                 course=self.quiz.lesson.module.course
             )
             
-            # Calculate new average quiz score
+            # Get all completed attempts ordered by date
             all_attempts = QuizAttempt.objects.filter(
                 student=self.student,
                 quiz__lesson__module__course=enrollment.course,
                 status=QuizAttempt.Status.COMPLETED
-            )
+            ).order_by('-submitted_at')
             
-            avg_score = all_attempts.aggregate(
-                models.Avg('score_percentage')
-            )['score_percentage__avg'] or 0
+            if not all_attempts.exists():
+                enrollment.average_quiz_score = 0
+                enrollment.save(update_fields=['average_quiz_score'])
+                return
             
-            enrollment.average_quiz_score = avg_score
+            # Calculate weighted average with strong recency bias
+            # Strategy: 70% weight on last 2 attempts, 30% on remaining attempts
+            # This ensures recent performance (mastery demonstration) outweighs old failures
+            now = timezone.now()
+            attempt_list = list(all_attempts)
+            
+            if len(attempt_list) == 0:
+                weighted_avg = 0
+            elif len(attempt_list) == 1:
+                weighted_avg = float(attempt_list[0].score_percentage)
+            elif len(attempt_list) == 2:
+                # Average of both
+                weighted_avg = (float(attempt_list[0].score_percentage) + float(attempt_list[1].score_percentage)) / 2
+            else:
+                # 70% weight on last 2 attempts, 30% on the rest
+                recent_2_avg = (float(attempt_list[0].score_percentage) + float(attempt_list[1].score_percentage)) / 2
+                
+                # Historical average (remaining attempts)
+                historical_sum = sum(float(a.score_percentage) for a in attempt_list[2:])
+                historical_avg = historical_sum / len(attempt_list[2:])
+                
+                weighted_avg = (recent_2_avg * 0.70) + (historical_avg * 0.30)
+            
+            enrollment.average_quiz_score = round(weighted_avg, 2)
             enrollment.save(update_fields=['average_quiz_score'])
             
         except Enrollment.DoesNotExist:
@@ -551,3 +589,6 @@ class QuestionResponse(models.Model):
     
     def __str__(self):
         return f"{self.attempt} - Q{self.question.order}"
+
+# Import CSV import models to register with Django
+from .import_models import ImportHistory, ImportRecord

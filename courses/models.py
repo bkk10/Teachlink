@@ -127,7 +127,7 @@ class Course(models.Model):
             'status_color': status_color,
             'total_at_risk': high_risk_count + medium_risk_count
         }
-    
+
     def publish(self):
         """Publish the course"""
         self.status = self.Status.PUBLISHED
@@ -540,8 +540,7 @@ class Enrollment(models.Model):
     def update_progress(self):
         """Calculate and update course progress percentage"""
         total_lessons = Lesson.objects.filter(
-            module__course=self.course,
-            is_published=True
+            module__course=self.course
         ).count()
         
         completed_lessons = LessonCompletion.objects.filter(

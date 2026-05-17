@@ -1,5 +1,5 @@
 """
-Assessment views for TeachLink
+Assessment views for Teachly
 """
 from django.db import models  # Add this at the top with other imports
 from rest_framework import viewsets, permissions, status, generics
@@ -196,6 +196,37 @@ class QuizViewSet(viewsets.ModelViewSet):
             ).first()
             if enrollment:
                 enrollment.update_last_activity()
+                
+                # AUTO-COMPLETE LESSON if student passed the quiz
+                if attempt.passed:
+                    from courses.models import LessonCompletion, Lesson
+                    lesson = quiz.lesson
+                    completion, created = LessonCompletion.objects.get_or_create(
+                        student=request.user,
+                        lesson=lesson,
+                        defaults={
+                            'completed_at': timezone.now(),
+                            'time_spent_seconds': quiz.time_limit_minutes * 60 if quiz.time_limit_minutes else 1800
+                        }
+                    )
+                    if created:
+                        print(f"[AUTO-COMPLETE] Lesson '{lesson.title}' completed for {request.user.email}")
+                    
+                    # Recalculate enrollment progress
+                    total_lessons = Lesson.objects.filter(
+                        module__course=enrollment.course,
+                        is_published=True
+                    ).count()
+                    completed_lessons = LessonCompletion.objects.filter(
+                        student=request.user,
+                        lesson__module__course=enrollment.course
+                    ).count()
+                    if total_lessons > 0:
+                        enrollment.progress_percentage = (completed_lessons / total_lessons) * 100
+                        enrollment.save(update_fields=['progress_percentage'])
+                        print(f"[PROGRESS UPDATED] {request.user.email}: {enrollment.progress_percentage:.1f}%")
+                
+                # Recalculate risk and check alerts
                 RiskEngine.calculate_student_risk(str(enrollment.id))
                 AlertGenerator.check_and_generate_alerts(enrollment_id=str(enrollment.id))
         
@@ -204,7 +235,8 @@ class QuizViewSet(viewsets.ModelViewSet):
             'score': attempt.score,
             'score_percentage': score_percentage,
             'passed': attempt.passed,
-            'feedback': attempt.feedback
+            'feedback': attempt.feedback,
+            'lesson_completed': attempt.passed  # Inform client that lesson was auto-completed
         })
     
     @action(detail=False, methods=['get'], permission_classes=[IsStudent])

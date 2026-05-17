@@ -91,6 +91,7 @@ class DifficultyAnalyzer:
                 'failure_rate': float(failure_rate),
                 'attempt_intensity': float(attempt_intensity),
                 'reaccess_intensity': float(reaccess_intensity),
+                'access_frequency': float(reaccess_intensity),  # Alias for compatibility
                 'reaccess_count': cls._get_reaccess_count(lesson),
                 'time_spent_ratio': float(time_spent_ratio),
             },
@@ -202,7 +203,7 @@ class DifficultyAnalyzer:
             Avg('time_spent_seconds')
         )['time_spent_seconds__avg']
         
-        if lesson.estimated_minutes > 0:
+        if lesson.estimated_minutes and lesson.estimated_minutes > 0:
             estimated_seconds = lesson.estimated_minutes * 60
             return avg_time_spent / estimated_seconds
         

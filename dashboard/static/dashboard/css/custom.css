@@ -114,6 +114,8 @@ input, textarea, select, button,
     background: #dbeafe;
     color: #1d4ed8;
     font-weight: 600;
+    border-left: 3px solid #2563eb;
+    padding-left: calc(0.75rem - 3px);
 }
 
 .sidebar-section-title {

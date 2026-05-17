@@ -3,6 +3,15 @@
 
 {% block title %}Course Management{% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active" aria-current="page">My Courses</li>
+    </ol>
+</nav>
+{% endblock %}
+
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sortablejs@latest/sortable.min.css">
 <style>
@@ -638,18 +647,18 @@
             
             <!-- Tabs -->
             <div class="border-b border-gray-200 mb-6 overflow-x-auto">
-                <nav class="flex space-x-6 min-w-max">
-                    <button class="tab-btn active px-1 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600" data-tab="lessons">
+                <nav class="flex space-x-1 min-w-max">
+                    <button class="tab-btn active px-4 py-3 text-sm font-semibold text-blue-600 border-b-2 border-blue-600 bg-blue-50/50 rounded-t-lg transition-all" data-tab="lessons">
                         <i class="fas fa-list mr-2"></i>Lesson Overview
                     </button>
-                    <button class="tab-btn px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="assessments">
+                    <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent rounded-t-lg transition-all" data-tab="assessments">
                         <i class="fas fa-pencil-alt mr-2"></i>Assessments
                     </button>
-                    <button class="tab-btn px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="students">
-                        <i class="fas fa-users mr-2"></i>Risk Students Overview
+                    <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent rounded-t-lg transition-all" data-tab="students">
+                        <i class="fas fa-users mr-2"></i>Risk Students
                     </button>
-                    <button class="tab-btn px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="difficulty">
-                        <i class="fas fa-chart-line mr-2"></i>Lesson Difficulty Analyzer
+                    <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent rounded-t-lg transition-all" data-tab="difficulty">
+                        <i class="fas fa-chart-line mr-2"></i>Difficulty
                     </button>
                 </nav>
             </div>
@@ -665,18 +674,18 @@
 
                 <div class="module-container mb-4">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                        <h4 class="font-medium mb-0"><i class="fas fa-file-upload text-blue-600 mr-2"></i>Quick File Upload</h4>
-                        <span class="text-xs text-gray-500">Drag and drop a file to add as lesson content</span>
+                        <h4 class="font-medium mb-0"><i class="fas fa-file-upload text-blue-600 mr-2"></i>Quick Resource Upload</h4>
+                        <span class="text-xs text-gray-500">Upload a file to an existing module/lesson</span>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Module</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Target Module</label>
                             <select id="quickUploadModule" class="w-full border rounded px-3 py-2">
                                 <option value="">Add a module first</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Lesson Title</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">New Lesson Title</label>
                             <input id="quickUploadTitle" type="text" class="w-full border rounded px-3 py-2" placeholder="e.g. Week 1 Notes">
                         </div>
                         <div>
@@ -690,8 +699,9 @@
                     <input type="file" id="quickUploadFile" class="hidden">
                     <p id="quickUploadFileName" class="text-xs text-gray-500 mb-3">No file selected</p>
                     <button id="quickUploadBtn" class="btn btn-sm btn-primary">
-                        <i class="fas fa-upload mr-1"></i>Add File to Lesson Overview
+                        <i class="fas fa-upload mr-1"></i>Upload Resource
                     </button>
+                    <span class="text-xs text-muted ms-2">Creates a new lesson with the uploaded file</span>
                 </div>
                 
                 <div id="modulesContainer" class="space-y-4">
@@ -701,16 +711,21 @@
             
             <!-- Assessments Tab -->
             <div id="assessmentsTab" class="tab-content hidden">
+                <!-- CSV Import for Physical Tests -->
+                <div id="csvImportSection" class="mb-6">
+                    {% include "components/csv_import_form.html" %}
+                </div>
+                
                 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                     <h3 class="text-lg font-medium">Assessments</h3>
                     <div class="space-x-2">
-                        <button id="addQuizBtn" class="btn btn-sm btn-primary">
+                        <button id="addQuizBtn" class="btn btn-sm btn-primary" title="Create a new quiz with questions that students take online">
                             <i class="fas fa-plus mr-1"></i>Quiz
                         </button>
-                        <button id="addAssignmentBtn" class="btn btn-sm btn-success">
+                        <button id="addAssignmentBtn" class="btn btn-sm btn-success" title="Create an assignment requiring file submission (coming soon)">
                             <i class="fas fa-plus mr-1"></i>Assignment
                         </button>
-                        <button id="addCatBtn" class="btn btn-sm btn-secondary">
+                        <button id="addCatBtn" class="btn btn-sm btn-secondary" title="Create a CAT (Continuous Assessment Test) for manual/external score entry">
                             <i class="fas fa-plus mr-1"></i>CAT
                         </button>
                     </div>
@@ -723,36 +738,56 @@
 
             <!-- Risk Students Tab -->
             <div id="studentsTab" class="tab-content hidden">
-                <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4" id="studentsList">
-                    <!-- Populated by JavaScript -->
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium">Risk Students Overview</h3>
+                    <p class="text-sm text-muted">Comprehensive view with risk levels, primary drivers, and engagement metrics. Click "View" for detailed student profiles.</p>
+                </div>
+                <div id="studentsList">
+                    <!-- Populated by JavaScript as a responsive table -->
+                    <p class="text-gray-500 text-center py-8">Loading enrolled students...</p>
                 </div>
             </div>
 
             <!-- Difficulty Tab -->
             <div id="difficultyTab" class="tab-content hidden">
                 <div class="overflow-x-auto">
-                    <table class="table align-middle mb-0">
+                    <table class="table align-middle mb-0" id="difficultyTable">
                         <thead class="table-light">
-                                                        <tr>
-                                <th>Lesson</th>
-                                <th>Difficulty</th>
-                                <th>Failure Rate</th>
-                                <th>
+                            <tr>
+                                <th class="cursor-pointer" onclick="sortDifficultyTable('lesson')">
+                                    Lesson <i class="fas fa-sort text-muted small"></i>
+                                </th>
+                                <th class="cursor-pointer" onclick="sortDifficultyTable('difficulty')">
+                                    Difficulty <i class="fas fa-sort text-muted small"></i>
+                                </th>
+                                <th class="cursor-pointer" onclick="sortDifficultyTable('failure')">
+                                    Failure Rate <i class="fas fa-sort text-muted small"></i>
+                                </th>
+                                <th class="cursor-pointer" onclick="sortDifficultyTable('intensity')">
                                     Attempt Intensity
-                                    <i class="fas fa-info-circle text-muted ms-1"
-                                       title="Average completed quiz attempts per student, normalized so 3 attempts per student = 100%."></i>
+                                    <i class="fas fa-info-circle text-muted ms-1 cursor-help"
+                                       title="Average completed quiz attempts per student. Higher = students are retrying more (possible difficulty or engagement). 100% = 3+ attempts per student average."></i>
+                                    <i class="fas fa-sort text-muted small"></i>
                                 </th>
-                                <th>
+                                <th class="cursor-pointer" onclick="sortDifficultyTable('access')">
                                     Access Coverage
-                                    <i class="fas fa-info-circle text-muted ms-1"
-                                       title="Percent of active students in this course who accessed the lesson at least once."></i>
+                                    <i class="fas fa-info-circle text-muted ms-1 cursor-help"
+                                       title="Percentage of enrolled students who accessed this lesson at least once. Low coverage may indicate navigation issues or low engagement."></i>
+                                    <i class="fas fa-sort text-muted small"></i>
                                 </th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="difficultyList">
-                            <tr><td colspan="5" class="text-muted text-center py-3">Loading difficulty data...</td></tr>
+                            <tr><td colspan="6" class="text-muted text-center py-3">Loading difficulty data...</td></tr>
                         </tbody>
                     </table>
+                </div>
+                <div class="mt-3 text-xs text-muted">
+                    <strong>Difficulty Levels:</strong>
+                    <span class="badge bg-danger ms-2">HIGH</span> >60% failure rate
+                    <span class="badge bg-warning ms-2">MEDIUM</span> 30-60% failure rate
+                    <span class="badge bg-success ms-2">LOW</span> <30% failure rate
                 </div>
             </div>
         </div>
@@ -865,7 +900,7 @@
 <div id="assessmentModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden flex items-center justify-center z-50">
     <div class="bg-white rounded-lg max-w-md w-full mx-4">
         <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-medium" id="assessmentModalTitle">Add Assessment</h3>
+            <h3 class="text-lg font-medium" id="assessmentModalTitle">Add Quiz</h3>
         </div>
         <div class="px-6 py-4">
             <form id="assessmentForm">
@@ -873,84 +908,58 @@
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Lesson</label>
                     <select id="assessmentLesson" class="w-full border rounded px-3 py-2"></select>
+                    <p class="text-xs text-gray-500 mt-1">The quiz will be attached to this lesson</p>
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                    <input type="text" id="assessmentTitle" required class="w-full border rounded px-3 py-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Quiz Title</label>
+                    <input type="text" id="assessmentTitle" required class="w-full border rounded px-3 py-2" placeholder="e.g., Week 1 Quiz">
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea id="assessmentDescription" rows="3" class="w-full border rounded px-3 py-2"></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
+                    <textarea id="assessmentDescription" rows="2" class="w-full border rounded px-3 py-2" placeholder="Brief description for students"></textarea>
                 </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Passing Score (%)</label>
-                    <input type="number" id="assessmentPassingScore" value="70" class="w-full border rounded px-3 py-2">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Question</label>
-                    <textarea id="assessmentQuestionText" rows="2" class="w-full border rounded px-3 py-2" placeholder="Enter question text"></textarea>
-                </div>
-                <div class="grid grid-cols-1 gap-2">
-                    <input type="text" id="answerOption1" class="w-full border rounded px-3 py-2" placeholder="Option 1">
-                    <input type="text" id="answerOption2" class="w-full border rounded px-3 py-2" placeholder="Option 2">
-                    <input type="text" id="answerOption3" class="w-full border rounded px-3 py-2" placeholder="Option 3">
-                    <input type="text" id="answerOption4" class="w-full border rounded px-3 py-2" placeholder="Option 4">
-                </div>
-                <div class="mt-3">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Correct Answer</label>
-                    <select id="correctAnswerIndex" class="w-full border rounded px-3 py-2">
-                        <option value="1">Option 1</option>
-                        <option value="2">Option 2</option>
-                        <option value="3">Option 3</option>
-                        <option value="4">Option 4</option>
-                    </select>
-                </div>
-                <p class="text-xs text-blue-700 mt-3">
-                    <i class="fas fa-info-circle mr-1"></i>Auto-grading uses the correct answer selected above.
-                </p>
-                <div id="catWizard" class="mt-3 hidden">
-                    <div class="p-3 rounded border border-blue-200 bg-blue-50">
-                        <p class="text-xs text-blue-800 mb-2">
-                            <strong>CAT Wizard:</strong> Set CAT duration and optionally copy questions from an existing quiz.
-                        </p>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">CAT Duration (minutes)</label>
-                                <input type="number" id="catDurationMinutes" value="30" class="w-full border rounded px-3 py-2">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Copy from Existing Quiz</label>
-                                <select id="catSourceQuiz" class="w-full border rounded px-3 py-2">
-                                    <option value="">Start from scratch</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                <input type="checkbox" id="catCopyQuestions" class="rounded border-gray-300">
-                                Copy all questions from selected quiz
-                            </label>
-                        </div>
-                        <p class="text-xs text-gray-600 mt-2 mb-0">
-                            Tip: question section below is optional. You can save CAT details first, then add questions later.
-                        </p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Pass Score (%)</label>
+                        <input type="number" id="assessmentPassingScore" value="70" min="0" max="100" class="w-full border rounded px-3 py-2">
                     </div>
-                </div>
-                <div id="assessmentNonQuizHint" class="mt-3 text-xs text-amber-700 hidden">
-                    Assignment/CAT full workflow is not configured in this API. Use Quiz for auto-grading.
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Time Limit (min)</label>
+                        <input type="number" id="assessmentTimeLimit" value="30" min="0" class="w-full border rounded px-3 py-2">
+                        <p class="text-xs text-gray-500">0 = no limit</p>
+                    </div>
                 </div>
             </form>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
             <button id="cancelAssessmentBtn" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">Cancel</button>
-            <button id="saveAssessmentBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+            <button id="saveAssessmentBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Quiz</button>
         </div>
     </div>
 </div>
+
+<!-- Lesson Students Modal -->
+<div id="lessonStudentsModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg max-w-3xl w-full mx-4 max-h-[80vh] flex flex-col">
+        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-medium" id="lessonStudentsModalTitle">Students</h3>
+            <button onclick="$('#lessonStudentsModal').addClass('hidden')" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="px-6 py-4 overflow-y-auto flex-1" id="lessonStudentsList">
+            <p class="text-muted text-center">Loading...</p>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+            <button onclick="$('#lessonStudentsModal').addClass('hidden')" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">Close</button>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-<script src="{% static 'dashboard/js/course-management-v2.js' %}?v=20260329-01"></script>
+<script src="{% static 'dashboard/js/course-management-v2.js' %}?v=20260331-02"></script>
 {% endblock %}
 

@@ -1,0 +1,203 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .help-hero {
+        background: linear-gradient(120deg, #0b5ed7 0%, #1d4ed8 55%, #1e40af 100%);
+        border-radius: 1rem;
+        color: #fff;
+        box-shadow: 0 0.9rem 1.8rem rgba(30, 64, 175, 0.2);
+    }
+    .faq-card {
+        border: 0;
+        box-shadow: 0 0.45rem 1rem rgba(2, 6, 23, 0.08);
+        border-radius: 0.9rem;
+    }
+    .tutorial-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.8rem;
+        transition: all 0.2s ease;
+    }
+    .tutorial-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    }
+    .contact-card {
+        background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+        border: 1px solid #dbeafe;
+        border-radius: 0.9rem;
+    }
+    .accordion-button:not(.collapsed) {
+        background-color: #eff6ff;
+        color: #1d4ed8;
+    }
+    .accordion-button:focus {
+        box-shadow: none;
+        border-color: #dbeafe;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- Hero Section -->
+    <section class="help-hero p-4 p-md-5 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h1 class="fw-bold mb-2">Help & Support</h1>
+                <p class="mb-0 opacity-75">Find answers to common questions and learn how to get the most out of TeachLink.</p>
+            </div>
+            <div class="text-end">
+                <div class="hero-chip d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill" style="background: rgba(255,255,255,0.16);">
+                    <i class="fas fa-headset"></i>
+                    <span>Need more help? Contact your teacher</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="row g-4">
+        <!-- FAQ Section -->
+        <div class="col-lg-8">
+            <section class="card faq-card mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-circle-question text-blue-600 me-2"></i>Frequently Asked Questions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="faqAccordion">
+                        {% for faq in faqs %}
+                        <div class="accordion-item border-0 mb-2">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.counter }}">
+                                    <i class="fas fa-question-circle text-blue-500 me-2"></i>
+                                    {{ faq.question }}
+                                </button>
+                            </h2>
+                            <div id="faq{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body text-gray-600">
+                                    {{ faq.answer }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tutorials Section -->
+            <section class="card faq-card">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-graduation-cap text-blue-600 me-2"></i>Quick Tutorials
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% for tutorial in tutorials %}
+                        <div class="col-md-6">
+                            <div class="tutorial-card p-3 h-100">
+                                <div class="d-flex align-items-start gap-3">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center text-white" style="width: 48px; height: 48px; background: linear-gradient(135deg, #2563eb, #1d4ed8); flex-shrink: 0;">
+                                        <i class="fas {{ tutorial.icon }}"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="fw-semibold mb-1">{{ tutorial.title }}</h6>
+                                        <p class="small text-muted mb-0">{{ tutorial.description }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Contact & Quick Links -->
+        <div class="col-lg-4">
+            <!-- Contact Card -->
+            <section class="contact-card p-4 mb-4">
+                <h6 class="fw-bold mb-3">
+                    <i class="fas fa-envelope text-blue-600 me-2"></i>Contact Support
+                </h6>
+                <p class="small text-gray-600 mb-3">
+                    Can't find what you're looking for? Reach out for help.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="mailto:{{ user.course.teacher.email|default:'' }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-user-tie me-2"></i>Message Your Teacher
+                    </a>
+                    <a href="{% url 'student_dashboard' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </section>
+
+            <!-- Quick Links -->
+            <section class="card faq-card">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-link text-blue-600 me-2"></i>Quick Links
+                    </h6>
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="{% url 'dashboard_courses' %}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                        <i class="fas fa-book-open text-blue-500"></i>
+                        <span>My Courses</span>
+                        <i class="fas fa-chevron-right ms-auto small text-muted"></i>
+                    </a>
+                    <a href="{% url 'student_dashboard' %}#pendingAssessmentsCard" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                        <i class="fas fa-file-pen text-warning"></i>
+                        <span>Pending Assessments</span>
+                        <i class="fas fa-chevron-right ms-auto small text-muted"></i>
+                    </a>
+                    <a href="{% url 'dashboard_profile' %}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                        <i class="fas fa-user-circle text-success"></i>
+                        <span>My Profile</span>
+                        <i class="fas fa-chevron-right ms-auto small text-muted"></i>
+                    </a>
+                    <a href="{% url 'student_dashboard' %}#riskHistoryCard" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                        <i class="fas fa-shield-heart text-danger"></i>
+                        <span>Risk History</span>
+                        <i class="fas fa-chevron-right ms-auto small text-muted"></i>
+                    </a>
+                </div>
+            </section>
+
+            <!-- Tips Card -->
+            <section class="card faq-card mt-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-lightbulb text-yellow-500 me-2"></i>Pro Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0 small">
+                        <li class="mb-2 d-flex align-items-start gap-2">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Check your dashboard daily to stay on top of deadlines</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start gap-2">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Complete quizzes promptly to maintain a low risk score</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start gap-2">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Report difficulties early - don't wait until you're overwhelmed</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>Review failed quiz attempts to understand where you need improvement</span>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

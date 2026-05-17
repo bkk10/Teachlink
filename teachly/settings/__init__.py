@@ -1,0 +1,3 @@
+"""
+Teachly settings package
+"""

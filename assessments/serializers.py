@@ -1,5 +1,5 @@
 """
-Assessment serializers for TeachLink
+Assessment serializers for Teachly
 """
 from rest_framework import serializers
 from django.utils import timezone

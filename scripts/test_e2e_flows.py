@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-End-to-End Integration Testing for TeachLink
+End-to-End Integration Testing for Teachly
 Tests complete user flows across all modules
 Run: python manage.py shell < scripts/test_e2e_flows.py
 """
@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachlink.settings.development')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachly.settings.development')
 django.setup()
 
 from django.contrib.auth import get_user_model
@@ -33,7 +33,7 @@ def test_complete_flow():
     
     # 1. Create test teacher
     teacher, _ = User.objects.get_or_create(
-        email='test.teacher@teachlink.com',
+        email='test.teacher@teachly.com',
         defaults={
             'username': 'test_teacher',
             'display_name': 'Test Teacher',
@@ -47,7 +47,7 @@ def test_complete_flow():
     
     # 2. Create test student
     student, _ = User.objects.get_or_create(
-        email='test.student@teachlink.com',
+        email='test.student@teachly.com',
         defaults={
             'username': 'test_student',
             'display_name': 'Test Student',

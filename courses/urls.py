@@ -17,4 +17,5 @@ router.register(r'risk-prediction', views.RiskPredictionViewSet, basename='risk-
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('<uuid:course_id>/lessons/', views.get_course_lessons, name='course-lessons'),
 ]

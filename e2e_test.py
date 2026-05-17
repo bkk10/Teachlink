@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 # Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachlink.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachly.settings')
 django.setup()
 
 from django.contrib.auth import get_user_model

@@ -3,6 +3,13 @@
 Quick test script for analytics services
 Run with: python manage.py shell < analytics/scripts/test_services.py
 """
+import django
+import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachly.settings.development')
+django.setup()
 
 from analytics.services.risk_engine import RiskEngine
 from analytics.services.difficulty_analyzer import DifficultyAnalyzer

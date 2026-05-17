@@ -1,0 +1,311 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard_courses' %}">My Courses</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Pending Assessments</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pending-hero {
+        background: linear-gradient(120deg, #f59e0b 0%, #d97706 55%, #b45309 100%);
+        border-radius: 1rem;
+        color: #fff;
+        box-shadow: 0 0.9rem 1.8rem rgba(217, 119, 6, 0.2);
+    }
+    .course-group {
+        border-left: 3px solid #3b82f6;
+        padding-left: 1rem;
+        margin-bottom: 2rem;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+        border-radius: 1rem;
+        border: 2px dashed #dbeafe;
+    }
+    .badge-online {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+    .badge-imported {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+    .assessment-table {
+        background: #fff;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .assessment-table th {
+        background: #f8fafc;
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #64748b;
+        border-bottom: 2px solid #e2e8f0;
+        padding: 0.75rem 1rem;
+    }
+    .assessment-table td {
+        padding: 0.75rem 1rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .assessment-table tr:hover {
+        background: #f8fafc;
+    }
+    .quiz-name {
+        font-weight: 600;
+        color: #1e293b;
+    }
+    .lesson-info {
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+    .btn-start { background: #f59e0b; color: #fff; border: none; }
+    .btn-start:hover { background: #d97706; color: #fff; }
+    .btn-retake { background: #fff; color: #f59e0b; border: 1px solid #f59e0b; }
+    .btn-retake:hover { background: #f59e0b; color: #fff; }
+    .btn-view { background: #3b82f6; color: #fff; border: none; }
+    .btn-view:hover { background: #2563eb; color: #fff; }
+    .btn-waiting { background: #f3f4f6; color: #9ca3af; border: 1px solid #e5e7eb; cursor: not-allowed; }
+    .btn-exhausted { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; cursor: not-allowed; }
+    .filter-bar {
+        background: #fff;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .attempt-history {
+        padding: 0.75rem 1rem;
+        background: #f8fafc;
+    }
+    .attempt-history table {
+        font-size: 0.8rem;
+    }
+    .attempt-history th {
+        background: transparent;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0.5rem;
+        font-weight: 600;
+        color: #64748b;
+    }
+    .attempt-history td {
+        padding: 0.5rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- Hero Section -->
+    <section class="pending-hero p-4 p-md-5 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h1 class="fw-bold mb-2">
+                    <i class="fas fa-file-pen me-2"></i>Pending Assessments
+                </h1>
+                <p class="mb-0 opacity-75">
+                    {% if total_pending > 0 %}
+                        {{ total_pending }} assessment{{ total_pending|pluralize }} waiting
+                        {% if total_online > 0 %}
+                            ({{ total_online }} online, {{ total_imported }} recorded)
+                        {% endif %}
+                    {% else %}
+                        All caught up! No pending assessments.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </section>
+
+    {% if pending_assessments %}
+        <!-- Compact Filter Bar -->
+        <div class="filter-bar d-flex align-items-center justify-content-between">
+            <form method="get" class="d-flex gap-2 align-items-center">
+                <label class="fw-semibold text-muted mb-0 small">Course:</label>
+                <select name="course" class="form-select form-select-sm" style="min-width: 200px;" onchange="this.form.submit()">
+                    <option value="all" {% if selected_course == 'all' %}selected{% endif %}>All Courses</option>
+                    {% for enrollment in all_enrollments %}
+                    <option value="{{ enrollment.course.id }}" {% if selected_course == enrollment.course.id|stringformat:"s" %}selected{% endif %}>
+                        {{ enrollment.course.title }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if selected_course != 'all' %}
+                <a href="?course=all" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                </a>
+                {% endif %}
+            </form>
+            <span class="text-muted small">{{ total_pending }} pending ({{ total_online }} online, {{ total_imported }} recorded)</span>
+        </div>
+
+        <!-- Assessment Tables by Course -->
+        {% for course_id, course in course_groups.items %}
+        <div class="course-group">
+            {% if selected_course == 'all' %}
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <h6 class="fw-bold mb-0 text-primary">{{ course.course_title }}</h6>
+                <span class="badge bg-light text-muted border" style="font-size: 0.7rem;">{{ course.online_count|add:course.imported_count }} items</span>
+            </div>
+            {% endif %}
+            
+            <div class="assessment-table">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 40%">Assessment</th>
+                            <th style="width: 15%">Pass Threshold</th>
+                            <th style="width: 15%">Attempts</th>
+                            <th style="width: 15%">Best Score</th>
+                            <th style="width: 15%">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for assessment in course.assessments %}
+                        <tr class="assessment-row" data-quiz-id="{{ assessment.quiz_id }}">
+                            <td>
+                                <div class="d-flex align-items-start gap-2">
+                                    {% if assessment.is_imported %}
+                                    <i class="fas fa-file-import text-muted mt-1"></i>
+                                    {% else %}
+                                    <i class="fas fa-laptop text-blue-500 mt-1"></i>
+                                    {% endif %}
+                                    <div>
+                                        <div class="quiz-name">{{ assessment.quiz_title }}</div>
+                                        <div class="lesson-info">
+                                            {{ assessment.lesson_title }}
+                                            {% if assessment.time_limit > 0 %}
+                                            <span class="text-muted">| {{ assessment.time_limit }} min limit</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border">{{ assessment.passing_score|default:70 }}%</span>
+                            </td>
+                            <td>
+                                <span class="badge {% if assessment.attempts_left == 0 %}bg-danger{% elif assessment.attempts_left == 1 %}bg-warning text-dark{% else %}bg-success-subtle text-success{% endif %}">
+                                    {{ assessment.attempts_left }} of {{ assessment.max_attempts }} left
+                                    {% if assessment.is_imported %}(online){% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                {% if assessment.has_attempts and assessment.best_score is not None %}
+                                <span class="{% if assessment.best_score >= assessment.passing_score|default:70 %}text-success{% else %}text-danger{% endif %} fw-semibold">
+                                    {{ assessment.best_score|floatformat:0 }}%
+                                </span>
+                                {% else %}
+                                <span class="text-muted small">Not taken</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    {% if assessment.action_type == 'start' %}
+                                    <a href="{{ assessment.attempts_url }}?take=1" class="btn btn-sm btn-start flex-fill">
+                                        <i class="fas fa-play me-1"></i>Start
+                                    </a>
+                                    {% elif assessment.action_type == 'retake' %}
+                                    <a href="{{ assessment.attempts_url }}?take=1" class="btn btn-sm btn-retake flex-fill">
+                                        <i class="fas fa-redo me-1"></i>Retake
+                                    </a>
+                                    {% elif assessment.action_type == 'continue' %}
+                                    <a href="{{ assessment.attempts_url }}?take=1" class="btn btn-sm btn-warning flex-fill">
+                                        <i class="fas fa-play me-1"></i>Continue
+                                    </a>
+                                    {% elif assessment.action_type == 'view_results' %}
+                                    <button class="btn btn-sm btn-view flex-fill" onclick="toggleAttempts('{{ assessment.quiz_id }}')">
+                                        <i class="fas fa-eye me-1"></i>Details
+                                    </button>
+                                    {% elif assessment.action_type == 'waiting' %}
+                                    <button class="btn btn-sm btn-waiting flex-fill" disabled>
+                                        <i class="fas fa-hourglass-half me-1"></i>Wait
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% if assessment.has_attempts %}
+                        <tr class="attempt-history-row d-none" id="attempts-{{ assessment.quiz_id }}">
+                            <td colspan="4" class="p-0">
+                                <div class="attempt-history bg-light border-top">
+                                    <table class="table table-sm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th class="small">Attempt</th>
+                                                <th class="small">Score</th>
+                                                <th class="small">Result</th>
+                                                <th class="small">Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for attempt in assessment.attempt_history %}
+                                            <tr>
+                                                <td class="small">#{{ attempt.attempt_number }}</td>
+                                                <td class="small">{{ attempt.score_percentage|floatformat:0 }}%</td>
+                                                <td class="small">
+                                                    {% if attempt.passed %}
+                                                    <span class="badge bg-success" style="font-size: 0.65rem;">PASS</span>
+                                                    {% else %}
+                                                    <span class="badge bg-danger" style="font-size: 0.65rem;">FAIL</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="small text-muted">{{ attempt.submitted_at|date:"M d, Y" }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    
+    {% else %}
+        <!-- Empty State -->
+        <div class="empty-state">
+            <div class="mb-3">
+                <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+            </div>
+            <h4 class="fw-bold text-success mb-2">All Caught Up!</h4>
+            <p class="text-muted mb-4">You have completed all available assessments. Great work!</p>
+            <a href="{% url 'dashboard_courses' %}" class="btn btn-primary">
+                <i class="fas fa-book me-2"></i>Explore Courses
+            </a>
+        </div>
+    {% endif %}
+
+    <!-- Back to Dashboard -->
+    <div class="mt-4 text-center">
+        <a href="{% url 'student_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+function toggleAttempts(quizId) {
+    const historyRow = document.getElementById('attempts-' + quizId);
+    if (historyRow) {
+        historyRow.classList.toggle('d-none');
+    }
+}
+</script>
+{% endblock %}

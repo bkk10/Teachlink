@@ -1,0 +1,268 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .deadlines-hero {
+        background: linear-gradient(120deg, #0b5ed7 0%, #1d4ed8 55%, #1e40af 100%);
+        border-radius: 1rem;
+        color: #fff;
+        box-shadow: 0 0.9rem 1.8rem rgba(30, 64, 175, 0.2);
+    }
+    .deadline-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.8rem;
+        background: #fff;
+        transition: all 0.2s ease;
+    }
+    .deadline-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    .urgent-card {
+        border-left: 4px solid #dc2626;
+    }
+    .warning-card {
+        border-left: 4px solid #f59e0b;
+    }
+    .ontrack-card {
+        border-left: 4px solid #10b981;
+    }
+    .progress-ring {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+    .calendar-view {
+        background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+        border: 1px solid #dbeafe;
+        border-radius: 0.8rem;
+        padding: 1.5rem;
+    }
+    .stat-pill {
+        background: rgba(255,255,255,0.16);
+        border-radius: 999px;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- Hero Section -->
+    <section class="deadlines-hero p-4 p-md-5 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h1 class="fw-bold mb-2">
+                    <i class="fas fa-calendar-day me-2"></i>Deadlines & Schedule
+                </h1>
+                <p class="mb-0 opacity-75">
+                    Stay on track with your course progress and upcoming targets.
+                </p>
+            </div>
+            <div class="text-end">
+                <div class="stat-pill mb-2">
+                    <i class="fas fa-fire"></i>
+                    <span>{{ urgent_count }} urgent this week</span>
+                </div>
+                <div class="small opacity-75">{{ total_courses }} active courses</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center text-white" style="width: 48px; height: 48px; background: linear-gradient(135deg, #dc2626, #b91c1c);">
+                        <i class="fas fa-fire"></i>
+                    </div>
+                    <div class="h4 mb-0 fw-bold text-danger">{{ urgent_count }}</div>
+                    <div class="small text-muted">Urgent (≤7 days)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center text-white" style="width: 48px; height: 48px; background: linear-gradient(135deg, #f59e0b, #d97706);">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="h4 mb-0 fw-bold text-warning">{{ on_track_count }}</div>
+                    <div class="small text-muted">On Track</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center text-white" style="width: 48px; height: 48px; background: linear-gradient(135deg, #10b981, #059669);">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="h4 mb-0 fw-bold text-success">
+                        {{ avg_progress|floatformat:0 }}%
+                    </div>
+                    <div class="small text-muted">Avg Progress</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center text-white" style="width: 48px; height: 48px; background: linear-gradient(135deg, #3b82f6, #2563eb);">
+                        <i class="fas fa-book-open"></i>
+                    </div>
+                    <div class="h4 mb-0 fw-bold text-blue-600">{{ total_courses }}</div>
+                    <div class="small text-muted">Active Courses</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deadlines List -->
+    <h5 class="fw-bold mb-3">
+        <i class="fas fa-list text-blue-500 me-2"></i>Course Deadlines
+    </h5>
+    
+    {% if deadlines %}
+        <div class="row g-3 mb-4">
+            {% for deadline in deadlines %}
+            <div class="col-md-6 col-lg-4">
+                <div class="deadline-card p-3 h-100 {% if deadline.days_left <= 7 %}urgent-card{% elif deadline.days_left <= 14 %}warning-card{% else %}ontrack-card{% endif %}">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h6 class="fw-semibold mb-0">{{ deadline.course_title }}</h6>
+                        {% if deadline.days_left <= 7 %}
+                            <span class="badge bg-danger">{{ deadline.days_left }} days left</span>
+                        {% elif deadline.days_left <= 14 %}
+                            <span class="badge bg-warning">{{ deadline.days_left }} days left</span>
+                        {% else %}
+                            <span class="badge bg-success">{{ deadline.days_left }} days left</span>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Progress Comparison -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-muted">Current Progress</span>
+                            <span class="fw-semibold">{{ deadline.current_progress|floatformat:0 }}%</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar {% if deadline.progress_gap > 10 %}bg-danger{% elif deadline.progress_gap > 5 %}bg-warning{% else %}bg-success{% endif %}" 
+                                 role="progressbar" 
+                                 style="width: {{ deadline.current_progress }}%"></div>
+                        </div>
+                        
+                        {% if deadline.expected_progress %}
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-muted">Expected by Now</span>
+                            <span class="fw-semibold">{{ deadline.expected_progress|floatformat:0 }}%</span>
+                        </div>
+                        <div class="progress" style="height: 4px;">
+                            <div class="progress-bar bg-secondary" 
+                                 role="progressbar" 
+                                 style="width: {{ deadline.expected_progress }}%; opacity: 0.5;"></div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Status Indicators -->
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        {% if deadline.progress_gap > 5 %}
+                        <span class="badge bg-danger-subtle text-danger">
+                            <i class="fas fa-triangle-exclamation me-1"></i>{{ deadline.progress_gap|floatformat:0 }}% behind
+                        </span>
+                        {% elif deadline.progress_gap > 0 %}
+                        <span class="badge bg-warning-subtle text-warning">
+                            <i class="fas fa-exclamation-circle me-1"></i>{{ deadline.progress_gap|floatformat:0 }}% behind
+                        </span>
+                        {% else %}
+                        <span class="badge bg-success-subtle text-success">
+                            <i class="fas fa-check-circle me-1"></i>On track
+                        </span>
+                        {% endif %}
+                        
+                        <span class="badge {% if deadline.risk_level == 'HIGH' %}bg-danger{% elif deadline.risk_level == 'MEDIUM' %}bg-warning{% else %}bg-success{% endif %}">
+                            {{ deadline.risk_level }} Risk
+                        </span>
+                    </div>
+                    
+                    <a href="{% url 'student_course_quizzes' course_id=deadline.course_id %}" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="fas fa-arrow-right me-2"></i>Continue Course
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Tips Section -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h6 class="fw-bold mb-0">
+                    <i class="fas fa-lightbulb text-yellow-500 me-2"></i>Staying on Track
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-start gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0" style="width: 40px; height: 40px; background: linear-gradient(135deg, #dc2626, #b91c1c);">
+                                <i class="fas fa-fire"></i>
+                            </div>
+                            <div>
+                                <div class="fw-semibold">Urgent Courses (≤7 days)</div>
+                                <div class="small text-muted">Prioritize these courses immediately. Complete at least one lesson or quiz today.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-start gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0" style="width: 40px; height: 40px; background: linear-gradient(135deg, #f59e0b, #d97706);">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div>
+                                <div class="fw-semibold">Warning Zone (8-14 days)</div>
+                                <div class="small text-muted">You have time but should plan regular study sessions to stay on track.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-start gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0" style="width: 40px; height: 40px; background: linear-gradient(135deg, #10b981, #059669);">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div>
+                                <div class="fw-semibold">On Track (>14 days)</div>
+                                <div class="small text-muted">You're in good shape! Maintain your current pace to finish on time.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            No deadline data available. Enroll in courses to see your progress deadlines.
+        </div>
+    {% endif %}
+
+    <!-- Back to Dashboard -->
+    <div class="mt-4 text-center">
+        <a href="{% url 'student_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

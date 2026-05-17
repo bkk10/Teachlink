@@ -3,6 +3,15 @@
 
 {% block title %}Topic Difficulty Analysis{% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Topic Difficulty</li>
+    </ol>
+</nav>
+{% endblock %}
+
 {% block extra_css %}
 <style>
     .dashboard-card { border: 0; box-shadow: 0 0.5rem 1.25rem rgba(15, 23, 42, 0.08); }
@@ -71,6 +80,13 @@
         <div class="card-header bg-white">
             <h6 class="mb-1 section-title">Hardest Topics (Ranked by Difficulty Score)</h6>
             <p class="small text-muted mb-0">Difficulty combines failure rate (40%), repeated attempts (35%), and repeated access (25%). Lower scores = easier topics.</p>
+            <div class="mt-2 p-2 bg-light rounded small">
+                <strong><i class="fas fa-info-circle me-1"></i>Metric Definitions:</strong>
+                <span class="ms-2" title="Percentage of quiz attempts that failed (scored below passing threshold)"><strong>Failure Rate:</strong> % of failed quiz attempts</span>
+                <span class="ms-2" title="How many times students retake quizzes (higher = more struggling)"><strong>Attempt Intensity:</strong> repeat quiz attempts</span>
+                <span class="ms-2" title="How many unique students accessed this lesson"><strong>Access Count:</strong> unique student views</span>
+                <span class="ms-2" title="% of enrolled students who accessed this lesson"><strong>Coverage:</strong> student reach</span>
+            </div>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -79,11 +95,26 @@
                         <th>#</th>
                         <th>Lesson Name</th>
                         <th>Course</th>
-                        <th>Difficulty Score</th>
-                        <th>Failure Rate</th>
-                        <th>Attempt Intensity</th>
-                        <th>Access Count</th>
-                        <th>Coverage %</th>
+                        <th>
+                            Difficulty Score
+                            <i class="fas fa-circle-info text-muted ms-1" title="Composite score: 40% failure rate + 35% attempt intensity + 25% repeated access. Higher = harder."></i>
+                        </th>
+                        <th>
+                            Failure Rate
+                            <i class="fas fa-circle-info text-muted ms-1" title="% of quiz attempts where students scored below passing threshold. Example: 65% means 65 out of 100 attempts failed."></i>
+                        </th>
+                        <th>
+                            Attempt Intensity
+                            <i class="fas fa-circle-info text-muted ms-1" title="How often students retake quizzes. Higher % means students struggle and retry multiple times."></i>
+                        </th>
+                        <th>
+                            Access Count
+                            <i class="fas fa-circle-info text-muted ms-1" title="Number of unique students who opened this lesson. Not total views - unique students only."></i>
+                        </th>
+                        <th>
+                            Coverage %
+                            <i class="fas fa-circle-info text-muted ms-1" title="% of enrolled students who accessed this lesson. 100% = all students viewed it."></i>
+                        </th>
                     </tr>
                 </thead>
                 <tbody id="difficultyTableBody">
@@ -227,10 +258,26 @@ function renderDifficultyTable(lessons) {
     const html = lessons.map((lesson, index) => {
         const diffClass = lesson.difficulty_level === 'HIGH' ? 'danger' : 
                          (lesson.difficulty_level === 'MEDIUM' ? 'warning' : 'success');
+        
+        // Build "what happened" breakdown
+        const failurePct = Math.round(lesson.failure_rate * 100);
+        const attemptIntensity = Number(lesson.attempt_intensity * 100).toFixed(0);
+        const totalAttempts = lesson.total_attempts || 0;
+        const failedAttempts = lesson.failed_attempts || 0;
+        const uniqueStudents = lesson.access_count || 0;
+        const retakingStudents = lesson.retaking_students || 0;
+        
         return `
-            <tr>
+            <tr class="lesson-main-row" data-lesson="${index}">
                 <td><strong>${index + 1}</strong></td>
-                <td>${lesson.lesson_title}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <span>${lesson.lesson_title}</span>
+                        <button class="btn btn-sm btn-link text-muted ms-2" onclick="toggleLessonDetails(${index})" title="Show details">
+                            <i class="fas fa-chevron-down" id="chevron-${index}"></i>
+                        </button>
+                    </div>
+                </td>
                 <td>${lesson.course_title}</td>
                 <td>
                     <div class="d-flex align-items-center gap-2">
@@ -238,14 +285,71 @@ function renderDifficultyTable(lessons) {
                         <span class="badge text-bg-${diffClass} difficulty-badge">${lesson.difficulty_level}</span>
                     </div>
                 </td>
-                <td><strong>${Math.round(lesson.failure_rate * 100)}%</strong></td>
-                <td>${Number(lesson.attempt_intensity * 100).toFixed(0)}%</td>
-                <td>${lesson.access_count}</td>
+                <td><strong>${failurePct}%</strong></td>
+                <td>${attemptIntensity}%</td>
+                <td>${uniqueStudents}</td>
                 <td>${Number(lesson.access_coverage_pct).toFixed(1)}%</td>
+            </tr>
+            <tr class="lesson-details-row d-none" id="details-${index}">
+                <td colspan="8" class="bg-light">
+                    <div class="p-3">
+                        <h6 class="small fw-bold mb-2"><i class="fas fa-chart-pie me-1"></i>What happened in this lesson:</h6>
+                        <div class="row g-2 small">
+                            <div class="col-md-3">
+                                <div class="p-2 bg-white rounded border">
+                                    <div class="text-muted">Total Quiz Attempts</div>
+                                    <div class="fs-6 fw-bold">${totalAttempts}</div>
+                                    <div class="text-muted smaller">all students combined</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="p-2 bg-white rounded border">
+                                    <div class="text-muted">Failed Attempts</div>
+                                    <div class="fs-6 fw-bold text-danger">${failedAttempts}</div>
+                                    <div class="text-muted smaller">${failurePct}% failure rate</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="p-2 bg-white rounded border">
+                                    <div class="text-muted">Students Retaking</div>
+                                    <div class="fs-6 fw-bold text-warning">${retakingStudents}</div>
+                                    <div class="text-muted smaller">${attemptIntensity}% intensity</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="p-2 bg-white rounded border">
+                                    <div class="text-muted">Unique Viewers</div>
+                                    <div class="fs-6 fw-bold text-success">${uniqueStudents}</div>
+                                    <div class="text-muted smaller">${Number(lesson.access_coverage_pct).toFixed(1)}% coverage</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-2 small text-muted">
+                            <strong>Why this ${lesson.difficulty_level} difficulty rating?</strong>
+                            ${lesson.difficulty_level === 'HIGH' 
+                                ? `High failure rate (${failurePct}%) + many retakes (${retakingStudents} students struggling).` 
+                                : lesson.difficulty_level === 'MEDIUM'
+                                ? `Moderate failure rate (${failurePct}%) with some students retaking.`
+                                : `Low failure rate (${failurePct}%) - students pass easily.`}
+                        </div>
+                    </div>
+                </td>
             </tr>
         `;
     }).join("");
     $("#difficultyTableBody").html(html);
+}
+
+function toggleLessonDetails(index) {
+    const detailsRow = $(`#details-${index}`);
+    const chevron = $(`#chevron-${index}`);
+    if (detailsRow.hasClass('d-none')) {
+        detailsRow.removeClass('d-none');
+        chevron.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+    } else {
+        detailsRow.addClass('d-none');
+        chevron.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+    }
 }
 </script>
 {% endblock %}

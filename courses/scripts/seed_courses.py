@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachlink.settings.development')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachly.settings.development')
 django.setup()
 
 from django.contrib.auth import get_user_model
@@ -23,13 +23,13 @@ import uuid
 User = get_user_model()
 
 def create_test_data():
-    print("🌱 Seeding test data for TeachLink...")
+    print("🌱 Seeding test data for Teachly...")
     print("=" * 50)
     
     # ============================================
     # 1. CREATE TEACHER
     # ============================================
-    teacher_email = "mr_ochieng@teachlink.com"
+    teacher_email = "mr_ochieng@teachly.com"
     teacher, created = User.objects.get_or_create(
         email=teacher_email,
         defaults={

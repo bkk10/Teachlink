@@ -413,8 +413,13 @@
 </style>
 
 <div class="csv-import-container">
-    <div class="csv-import-header">
-        📊 Import Assessment Scores from CSV
+    <div class="csv-import-header" style="justify-content: space-between;">
+        <div>
+            <i class="fas fa-file-csv text-primary me-2"></i>Import Assessment Scores from CSV
+        </div>
+        <a href="{% url 'csv_import_history' %}" class="csv-download-template" style="margin: 0;">
+            <i class="fas fa-history me-1"></i>View Import History
+        </a>
     </div>
 
     <div class="csv-import-tabs">
@@ -427,17 +432,61 @@
     {# UPLOAD TAB #}
     <div id="csv-tab-upload" class="csv-tab-content active">
         <div class="csv-upload-area" id="csv-drop-zone">
-            <div class="csv-upload-icon">📁</div>
+            <div class="csv-upload-icon"><i class="fas fa-cloud-upload-alt text-primary" style="font-size: 48px;"></i></div>
             <div class="csv-upload-text">Drag and drop CSV file here</div>
             <div class="csv-upload-hint">or click to browse</div>
             <button class="csv-upload-btn" onclick="document.getElementById('csv-file-input').click();">
-                Choose File
+                <i class="fas fa-folder-open me-2"></i>Choose File
             </button>
             <input type="file" id="csv-file-input" class="csv-upload-file-input" accept=".csv" />
         </div>
 
+        {# Course/Assessment Selection #}
+        <div class="csv-template-section" style="background: #f8f9fa; border-left: 3px solid #007bff;">
+            <div class="csv-template-title"><i class="fas fa-graduation-cap text-primary me-2"></i>Course & Lesson Mapping</div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="font-size: 12px; color: #555; font-weight: 600; display: block; margin-bottom: 5px;">
+                    <i class="fas fa-book me-1"></i>Select Course (Required)
+                </label>
+                <select id="csv-course-select" class="form-select form-select-sm" onchange="loadCourseLessons(this.value)" style="width: 100%; padding: 8px; font-size: 13px; border: 1px solid #ced4da; border-radius: 4px;">
+                    <option value="">-- Select a Course --</option>
+                    {% if courses %}
+                        {% for course in courses %}
+                        <option value="{{ course.id }}">{{ course.title }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="font-size: 12px; color: #555; font-weight: 600; display: block; margin-bottom: 5px;">
+                    <i class="fas fa-chalkboard me-1"></i>Select Lesson/Module
+                </label>
+                <select id="csv-lesson-select" class="form-select form-select-sm" style="width: 100%; padding: 8px; font-size: 13px; border: 1px solid #ced4da; border-radius: 4px;" disabled>
+                    <option value="">-- First select a course --</option>
+                </select>
+                <small style="color: #6c757d; font-size: 11px;">Lessons will load automatically when you select a course</small>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="font-size: 12px; color: #555; font-weight: 600; display: block; margin-bottom: 5px;">
+                    <i class="fas fa-tasks me-1"></i>Assessment/Quiz Name
+                </label>
+                <input type="text" id="csv-assessment-name" class="form-control form-control-sm" 
+                       placeholder="Enter assessment name (e.g., Machine Learning Quiz 1)" 
+                       style="width: 100%; padding: 8px; font-size: 13px; border: 1px solid #ced4da; border-radius: 4px;">
+                <small style="color: #6c757d; font-size: 11px;">Leave blank to use names from CSV file</small>
+            </div>
+
+            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; font-size: 12px;">
+                <i class="fas fa-lightbulb text-warning me-1"></i>
+                <strong>Tip:</strong> If the assessment doesn't exist, it will be created automatically in the selected lesson.
+            </div>
+        </div>
+
         <div class="csv-template-section">
-            <div class="csv-template-title">ℹ️ File Requirements</div>
+            <div class="csv-template-title"><i class="fas fa-info-circle text-info me-2"></i>File Requirements</div>
             <ul style="font-size: 12px; color: #555; margin: 0; padding-left: 20px;">
                 <li>Format: CSV (comma-separated values)</li>
                 <li>Required columns: Student Email, Assessment Name, Score, Date</li>
@@ -446,13 +495,13 @@
             </ul>
         </div>
 
-        <button class="csv-download-template" onclick="downloadTemplate()">📥 Download Template</button>
+        <button class="csv-download-template" onclick="downloadTemplate()"><i class="fas fa-download me-2"></i>Download Template</button>
     </div>
 
     {# TEMPLATE TAB #}
     <div id="csv-tab-template" class="csv-tab-content">
         <div class="csv-template-section">
-            <div class="csv-template-title">✓ CSV Template Format</div>
+            <div class="csv-template-title"><i class="fas fa-check-circle text-success me-2"></i>CSV Template Format</div>
             <table class="csv-template-table">
                 <thead>
                     <tr>
@@ -484,7 +533,7 @@
                 </tbody>
             </table>
 
-            <div class="csv-template-title" style="margin-top: 16px;">📋 Example CSV Content</div>
+            <div class="csv-template-title" style="margin-top: 16px;"><i class="fas fa-code text-secondary me-2"></i>Example CSV Content</div>
             <div class="csv-example-code">Student Email,Assessment Name,Score,Date
 alice@school.com,Quiz 1: Fractions,85,2024-01-15
 bob@school.com,Quiz 1: Fractions,92,2024-01-15
@@ -570,6 +619,38 @@ carol@school.com,Midterm Exam,78,2024-01-20</div>
 <script>
     let parsedData = [];
     const dropZone = document.getElementById('csv-drop-zone');
+
+    // Simple toast notification function
+    function toastNotify(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification toast-${type}`;
+        toast.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+            <span>${message}</span>
+        `;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
     const fileInput = document.getElementById('csv-file-input');
     const importBtn = document.getElementById('import-btn');
 
@@ -676,7 +757,7 @@ carol@school.com,Midterm Exam,78,2024-01-20</div>
             <tr class="csv-row-${record.status}">
                 <td>
                     <span class="csv-status-badge csv-status-${record.status}">
-                        ${record.status === 'valid' ? '✓' : record.status === 'warning' ? '⚠' : '✕'}
+                        ${record.status === 'valid' ? '<i class="fas fa-check"></i>' : record.status === 'warning' ? '<i class="fas fa-exclamation-triangle"></i>' : '<i class="fas fa-times"></i>'}
                     </span>
                 </td>
                 <td>${record.email}</td>
@@ -695,47 +776,96 @@ carol@school.com,Midterm Exam,78,2024-01-20</div>
             return;
         }
 
+        // Get the file from the input
+        const file = fileInput.files[0];
+        if (!file) {
+            toastNotify('Please select a file first', 'error');
+            return;
+        }
+
+        // Get selected course and assessment name
+        const courseSelect = document.getElementById('csv-course-select');
+        const courseId = courseSelect?.value;
+        const assessmentName = document.getElementById('csv-assessment-name')?.value;
+
+        if (!courseId) {
+            toastNotify('Please select a course first', 'error');
+            return;
+        }
+
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('course_id', courseId);
+        if (assessmentName) {
+            formData.append('assessment_name', assessmentName);
+        }
+
         switchTab('result');
         document.getElementById('result-empty').style.display = 'none';
         document.getElementById('result-container').style.display = 'block';
+        document.getElementById('progress-text').textContent = 'Uploading file...';
 
-        let successCount = 0;
-        let errorCount = 0;
-        let warningCount = 0;
+        try {
+            // Get CSRF token
+            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                            document.cookie.match(/csrftoken=([^;]+)/)?.[1];
 
-        for (let i = 0; i < validRecords.length; i++) {
-            const record = validRecords[i];
-            
-            try {
-                // Simulate API call
-                await new Promise(resolve => setTimeout(resolve, 200));
-                successCount++;
-            } catch (error) {
-                errorCount++;
-            }
+            const response = await fetch('/api/assessments/import/upload/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken
+                },
+                body: formData
+            });
 
-            const progressPercent = Math.round((i + 1) / validRecords.length * 100);
-            document.getElementById('progress-fill').style.width = progressPercent + '%';
-            document.getElementById('progress-percent').textContent = progressPercent + '%';
-            document.getElementById('progress-text').textContent = `Importing record ${i + 1} of ${validRecords.length}...`;
-        }
+            const result = await response.json();
 
-        warningCount = parsedData.filter(r => r.status === 'warning').length;
-
-        document.getElementById('result-success').textContent = successCount;
-        document.getElementById('result-warning').textContent = warningCount;
-        document.getElementById('result-error').textContent = errorCount;
-
-        setTimeout(() => {
             document.getElementById('import-progress').style.display = 'none';
             document.getElementById('result-details').style.display = 'block';
+
+            if (response.ok && result.success) {
+                document.getElementById('result-success').textContent = result.success_count || 0;
+                document.getElementById('result-warning').textContent = result.warning_count || 0;
+                document.getElementById('result-error').textContent = result.error_count || 0;
+
+                document.getElementById('result-message').innerHTML = `
+                    <p><strong>Import Complete!</strong></p>
+                    <p>${result.message || result.success_count + ' records imported successfully'}</p>
+                    ${result.students_affected ? `<p><strong>Risk Recalculated:</strong> ${result.students_affected} students affected</p>` : ''}
+                    <p class="mt-3">
+                        <a href="{% url 'csv_import_history' %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-history me-1"></i>View Import History
+                        </a>
+                    </p>
+                `;
+                toastNotify('Import completed successfully!', 'success');
+            } else {
+                document.getElementById('result-success').textContent = '0';
+                document.getElementById('result-warning').textContent = '0';
+                document.getElementById('result-error').textContent = result.total_records || parsedData.length;
+
+                document.getElementById('result-message').innerHTML = `
+                    <p><strong>Import Failed</strong></p>
+                    <p class="text-danger">${result.error || 'An error occurred during import'}</p>
+                    ${result.import_id ? `<p class="small text-muted">Import ID: ${result.import_id}</p>` : ''}
+                `;
+                toastNotify('Import failed: ' + (result.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            document.getElementById('import-progress').style.display = 'none';
+            document.getElementById('result-details').style.display = 'block';
+
+            document.getElementById('result-success').textContent = '0';
+            document.getElementById('result-warning').textContent = '0';
+            document.getElementById('result-error').textContent = validRecords.length;
+
             document.getElementById('result-message').innerHTML = `
-                <p><strong>Import Complete!</strong></p>
-                <p>${successCount} assessment records have been successfully imported and linked to student accounts.</p>
-                <p>Risk scores will be recalculated based on the new assessment data.</p>
+                <p><strong>Import Failed</strong></p>
+                <p class="text-danger">Network error: ${error.message}</p>
             `;
-            toastNotify(`${successCount} records imported successfully`, 'success');
-        }, 2000);
+            toastNotify('Import failed: ' + error.message, 'error');
+        }
     }
 
     function downloadTemplate() {
@@ -771,5 +901,44 @@ carol@school.com,Midterm Exam,78,2024-01-20</div>
     function isValidDate(dateString) {
         const date = new Date(dateString);
         return date instanceof Date && !isNaN(date);
+    }
+
+    // Load lessons when course is selected
+    async function loadCourseLessons(courseId) {
+        const lessonSelect = document.getElementById('csv-lesson-select');
+        
+        if (!courseId) {
+            lessonSelect.innerHTML = '<option value="">-- First select a course --</option>';
+            lessonSelect.disabled = true;
+            return;
+        }
+
+        lessonSelect.innerHTML = '<option value="">Loading lessons...</option>';
+        lessonSelect.disabled = true;
+
+        try {
+            const response = await fetch(`/api/courses/${courseId}/lessons/`);
+            if (!response.ok) throw new Error('Failed to load lessons');
+            
+            const data = await response.json();
+            
+            if (data.lessons && data.lessons.length > 0) {
+                lessonSelect.innerHTML = '<option value="">-- Select a lesson --</option>';
+                data.lessons.forEach(lesson => {
+                    const option = document.createElement('option');
+                    option.value = lesson.id;
+                    option.textContent = lesson.title;
+                    lessonSelect.appendChild(option);
+                });
+                lessonSelect.disabled = false;
+            } else {
+                lessonSelect.innerHTML = '<option value="">No lessons available in this course</option>';
+                lessonSelect.disabled = true;
+            }
+        } catch (error) {
+            console.error('Error loading lessons:', error);
+            lessonSelect.innerHTML = '<option value="">Error loading lessons</option>';
+            lessonSelect.disabled = true;
+        }
     }
 </script>

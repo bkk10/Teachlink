@@ -3,6 +3,14 @@
 
 {% block title %}Teacher Dashboard{% endblock %}
 
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
+    </ol>
+</nav>
+{% endblock %}
+
 {% block extra_css %}
 <style>
     .dashboard-card { border: 0; box-shadow: 0 0.5rem 1.25rem rgba(15, 23, 42, 0.08); }
@@ -69,6 +77,26 @@
     </div>
 
     <div class="row g-4 mb-4">
+        <!-- Course Selector for Charts -->
+        <div class="col-12">
+            <div class="card dashboard-card">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <label for="courseSelector" class="fw-semibold text-nowrap mb-0">
+                        <i class="fas fa-filter me-2 text-primary"></i>Filter by Course:
+                    </label>
+                    <select id="courseSelector" class="form-select" style="max-width: 400px;">
+                        <option value="">All Courses</option>
+                    </select>
+                    <span class="text-muted small ms-auto">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Select a course to see course-specific charts
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
         <div class="col-xl-5">
             <div class="card dashboard-card hero-card h-100">
                 <div class="card-body">
@@ -105,21 +133,6 @@
                             </div>
                             <div style="height: 280px;">
                                 <canvas id="riskChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-6">
-                    <div class="card dashboard-card h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                                <div>
-                                    <h6 class="section-title mb-1">How Class Risk Is Changing</h6>
-                                    <p id="trendChartInsight" class="small text-muted mb-0">Track whether overall class risk is improving or getting worse over time.</p>
-                                </div>
-                            </div>
-                            <div style="height: 280px;">
-                                <canvas id="trendChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -242,35 +255,75 @@
 {% block extra_js %}
 <script>
 let riskChartInstance = null;
-let trendChartInstance = null;
 let scoreChartInstance = null;
 
 $(function() {
+    loadCoursesForSelector();
     loadDashboardData();
     $("#refreshBtn").on("click", function() {
         $(this).prop("disabled", true);
         loadDashboardData().always(() => $(this).prop("disabled", false));
     });
+    $("#courseSelector").on("change", function() {
+        loadDashboardData();
+    });
 });
 
+let availableCourses = [];
+
+function loadCoursesForSelector() {
+    $.ajax({
+        url: "/api/courses/courses/",
+        method: "GET",
+        success: function(data) {
+            const courses = Array.isArray(data) ? data : (data.results || []);
+            availableCourses = courses;
+            const selector = $("#courseSelector");
+            selector.html('<option value="">All Courses</option>');
+            courses.forEach(course => {
+                selector.append(`<option value="${course.id}">${course.title}</option>`);
+            });
+        },
+        error: function(xhr) {
+            console.error("Failed to load courses:", xhr.status, xhr.responseText);
+        }
+    });
+}
+
+function getSelectedCourseId() {
+    return $("#courseSelector").val();
+}
+
 function loadDashboardData() {
-     const teacherReq = $.ajax({ url: "{% url 'teacher_api' %}", method: "GET" });
-     const trendReq = $.ajax({ url: "{% url 'risk_data_api' %}", method: "GET" });
+     const courseId = getSelectedCourseId();
+     const courseParam = courseId ? `?course_id=${courseId}` : '';
+     
+     const teacherReq = $.ajax({ url: "{% url 'teacher_api' %}" + courseParam, method: "GET" });
  
-     return $.when(teacherReq, trendReq).done(function(teacherRes, trendRes) {
-         const teacherData = teacherRes[0];
-         const trendData = trendRes[0];
- 
+     return $.when(teacherReq).done(function(teacherData) {
+         
+         // Update selector if we got course data back
+         if (teacherData.courses && teacherData.courses.length > 0 && availableCourses.length === 0) {
+             availableCourses = teacherData.courses;
+             const selector = $("#courseSelector");
+             selector.html('<option value="">All Courses</option>');
+             teacherData.courses.forEach(course => {
+                 selector.append(`<option value="${course.id}">${course.title}</option>`);
+             });
+             if (courseId) {
+                 selector.val(courseId);
+             }
+         }
+
          renderKPIs(teacherData.kpi || {});
-         renderAlertBanner(teacherData.kpi || {}); // NEW: render alert banner
+         renderAlertBanner(teacherData.kpi || {});
          renderAlerts(teacherData.recent_alerts || []);
          renderCourseRisk(teacherData.course_risk || []);
          renderRiskEngineSummary(teacherData.risk_engine_summary || {});
          renderFocusStudents(teacherData.focus_students || []);
          renderDifficulty(teacherData.hardest_topics || []);
-         renderHardestTopicsWidget(teacherData.hardest_topics || []); // NEW: render widget
+         renderHardestTopicsWidget(teacherData.hardest_topics || []);
          renderRiskChart(teacherData.risk_distribution || {});
-         renderTrendChart((trendData && trendData.risk_trend) ? trendData.risk_trend : { dates: [], avg_risk: [], max_risk: [] });
          renderScoreChart(teacherData.score_distribution || {});
      }).fail(function(xhr) {
          console.error("Dashboard load failed:", xhr.status, xhr.responseText);
@@ -294,11 +347,11 @@ function metricCard(icon, color, label, value) {
 
 function renderKPIs(kpi) {
     const html = [
-        metricCard("fas fa-users", "bg-primary", "Total Students", kpi.total_students || 0),
+        metricCard("fas fa-users", "bg-primary", "Total Enrollments", kpi.total_students || 0),
+        metricCard("fas fa-user-check", "bg-info", "Unique Students", kpi.total_unique_students || 0),
         metricCard("fas fa-triangle-exclamation", "bg-danger", "High Risk", kpi.high_risk_count || 0),
         metricCard("fas fa-circle-exclamation", "bg-warning", "Medium Risk", kpi.medium_risk_count || 0),
-        metricCard("fas fa-chart-line", "bg-success", "Avg Performance", (kpi.avg_performance || 0) + "%"),
-        metricCard("fas fa-bell", "bg-dark", "Active Alerts", kpi.active_alerts || 0)
+        metricCard("fas fa-chart-line", "bg-success", "Avg Performance", (kpi.avg_performance || 0) + "%")
     ].join("");
     $("#kpiCards").html(html);
 }
@@ -327,13 +380,13 @@ function riskBadge(level) {
     return map[level] || "secondary";
 }
 
-// NEW: Render alert banner with active alert count
+// NEW: Render alert banner with students who have alerts (not alert count)
 function renderAlertBanner(kpi) {
-    const activeAlerts = kpi.active_alerts || 0;
-    if (activeAlerts > 0) {
-        const alertText = activeAlerts === 1 
-            ? "⚠️ 1 student needs attention" 
-            : `⚠️ ${activeAlerts} students need attention`;
+    const studentsWithAlerts = kpi.students_with_alerts || 0;
+    if (studentsWithAlerts > 0) {
+        const alertText = studentsWithAlerts === 1 
+            ? "⚠️ 1 student has active alerts" 
+            : `⚠️ ${studentsWithAlerts} students have active alerts`;
         $("#alertBannerText").text(alertText);
         $("#alertBanner").show();
     } else {
@@ -465,18 +518,29 @@ function renderRiskChart(risk) {
     const labels = risk.labels || [];
     const values = risk.data || [];
     
-    // Generate actionable insight
-    const highRiskCount = values[0] || 0; // Typically HIGH is first
-    let insightText = "No current risk data found.";
+    // Generate data summary - concise, factual
+    let insightText = "";
     if (values.length > 0) {
+        const total = values.reduce((a, b) => a + b, 0);
+        const highRiskIndex = labels.findIndex(l => l.toLowerCase().includes('high'));
+        const criticalIndex = labels.findIndex(l => l.toLowerCase().includes('critical'));
+        let highRiskCount = 0;
+        if (highRiskIndex >= 0) highRiskCount += values[highRiskIndex] || 0;
+        if (criticalIndex >= 0) highRiskCount += values[criticalIndex] || 0;
+        
         if (highRiskCount > 0) {
-            insightText = `🚨 ${highRiskCount} students are at HIGH risk and need immediate attention. Review their profiles to identify why.`;
-        } else {
-            const insightParts = labels.map((label, index) => `${values[index] || 0} ${String(label).toLowerCase()}`);
-            insightText = `All students are in: ${insightParts.join(", ")}.`;
+            insightText = `🚨 ${highRiskCount} of ${total} students at HIGH risk`;
+        } else if (total > 0) {
+            insightText = `${total} students total — all at acceptable risk levels`;
         }
     }
-    $("#riskChartInsight").html(`<strong>Key Insight:</strong> ${insightText}`);
+    
+    // Update or hide insight text
+    if (insightText) {
+        $("#riskChartInsight").html(`<span class="small text-muted">${insightText}</span>`).show();
+    } else {
+        $("#riskChartInsight").hide();
+    }
 
     riskChartInstance = new Chart(canvas, {
         type: "doughnut",
@@ -487,53 +551,57 @@ function renderRiskChart(risk) {
                 backgroundColor: (risk.colors && risk.colors.length) ? risk.colors : ["#cbd5e1"]
             }]
         },
-        options: { maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
-    });
-}
-
-function renderTrendChart(trend) {
-    const canvas = document.getElementById("trendChart");
-    if (!canvas) return;
-    if (trendChartInstance) trendChartInstance.destroy();
-    const avg = trend.avg_risk || [];
-    const maxRisk = trend.max_risk || [];
-    
-    let insightText = "Trend updates as new risk snapshots are recorded.";
-    if (avg.length && maxRisk.length) {
-        const latestAvg = Math.round((avg[avg.length - 1] || 0) * 100);
-        const latestMax = Math.round((maxRisk[maxRisk.length - 1] || 0) * 100);
-        const previousAvg = avg.length > 1 ? Math.round((avg[avg.length - 2] || 0) * 100) : latestAvg;
-        const trend_direction = latestAvg > previousAvg ? "📈 increasing" : (latestAvg < previousAvg ? "📉 improving" : "→ stable");
-        insightText = `Class risk is ${trend_direction}. Average: ${latestAvg}%, Highest: ${latestMax}%.`;
-    }
-    $("#trendChartInsight").html(`<strong>Key Insight:</strong> ${insightText}`);
-
-    trendChartInstance = new Chart(canvas, {
-        type: "line",
-        data: {
-            labels: trend.dates || [],
-            datasets: [
-                { label: "Average Risk", data: trend.avg_risk || [], borderColor: "#0d6efd", backgroundColor: "rgba(13,110,253,0.12)", fill: true, tension: 0.3 },
-                { label: "Max Risk", data: trend.max_risk || [], borderColor: "#dc3545", tension: 0.3 }
-            ]
-        },
         options: {
             maintainAspectRatio: false,
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: "Date"
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: { 
+                        boxWidth: 12, 
+                        padding: 10, 
+                        font: { size: 11 },
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            if (data.labels.length && data.datasets.length) {
+                                const dataset = data.datasets[0];
+                                const total = dataset.data.reduce((a, b) => a + b, 0);
+                                return data.labels.map((label, i) => {
+                                    const value = dataset.data[i] || 0;
+                                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                    return {
+                                        text: `${label}: ${value} (${percentage}%)`,
+                                        fillStyle: dataset.backgroundColor[i],
+                                        hidden: isNaN(dataset.data[i]) || chart.getDatasetMeta(0).data[i].hidden,
+                                        index: i
+                                    };
+                                });
+                            }
+                            return [];
+                        }
                     }
                 },
-                y: {
-                    beginAtZero: true,
-                    max: 1,
-                    title: {
-                        display: true,
-                        text: "Risk Score (%)"
+                datalabels: {
+                    display: function(context) {
+                        return context.dataset.data[context.dataIndex] > 0;
                     },
-                    ticks: { callback: function(v){ return Math.round(v * 100) + "%"; } }
+                    color: '#fff',
+                    font: { weight: 'bold', size: 12 },
+                    formatter: function(value, context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                        return `${value}\n(${percentage}%)`;
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                            return `${label}: ${value} students (${percentage}%)`;
+                        }
+                    }
                 }
             }
         }
@@ -547,7 +615,8 @@ function renderScoreChart(distribution) {
     const labels = distribution.labels || [];
     const data = distribution.data || [];
     
-    let insightText = "Score distribution will update as students complete quizzes.";
+    // Generate factual summary
+    let insightText = "";
     if (labels.length && data.length) {
         let bestIndex = 0;
         for (let i = 1; i < data.length; i++) {
@@ -555,14 +624,21 @@ function renderScoreChart(distribution) {
         }
         const mostCount = data[bestIndex] || 0;
         const mostBand = labels[bestIndex];
-        const lowBand = data[0] || 0; // Usually 0-40% is index 0
+        const lowBand = data[0] || 0;
+        const total = data.reduce((a, b) => a + b, 0);
+        
         if (lowBand > 0) {
-            insightText = `⚠️ ${lowBand} students scoring below 40%. Most students (${mostCount}) are in the ${mostBand} band.`;
+            insightText = `⚠️ ${lowBand} below 40% · Most (${mostCount}) in ${mostBand}`;
         } else {
-            insightText = `Most students (${mostCount}) are in the ${mostBand} band.`;
+            insightText = `Most students (${mostCount} of ${total}) in ${mostBand}`;
         }
     }
-    $("#scoreChartInsight").html(`<strong>Key Insight:</strong> ${insightText}`);
+    
+    if (insightText) {
+        $("#scoreChartInsight").html(`<span class="small text-muted">${insightText}</span>`).show();
+    } else {
+        $("#scoreChartInsight").hide();
+    }
 
     scoreChartInstance = new Chart(canvas, {
         type: "bar",
@@ -576,12 +652,23 @@ function renderScoreChart(distribution) {
         },
         options: {
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    display: true,
+                    anchor: 'end',
+                    align: 'top',
+                    formatter: function(value) {
+                        return value > 0 ? value : '';
+                    },
+                    font: { size: 12, weight: 'bold' }
+                }
+            },
             scales: {
                 x: { title: { display: true, text: "Average Quiz Score Band" } },
                 y: {
                     beginAtZero: true,
-                    ticks: { precision: 0 },
+                    ticks: { precision: 0, stepSize: 1 },
                     title: { display: true, text: "Number of Students" }
                 }
             }
