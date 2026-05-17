@@ -4,9 +4,19 @@ import os
 import sys
 
 
+def _default_settings_module() -> str:
+    """Pick a safe default settings module for local vs hosted environments."""
+    if os.environ.get("VERCEL") == "1":
+        return "teachly.settings.production"
+    return "teachly.settings.development"
+
+
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', os.environ.get('DJANGO_SETTINGS_MODULE', 'teachly.settings.development'))
+    os.environ.setdefault(
+        "DJANGO_SETTINGS_MODULE",
+        os.environ.get("DJANGO_SETTINGS_MODULE", _default_settings_module()),
+    )
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
