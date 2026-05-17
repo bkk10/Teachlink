@@ -37,3 +37,10 @@ SECURE_BROWSER_XSS_FILTER = True
 # Static files
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Log some helpful startup info for debugging
+try:
+    print(f"[startup] DJANGO_SETTINGS_MODULE={os.getenv('DJANGO_SETTINGS_MODULE')}")
+    print(f"[startup] ALLOWED_HOSTS={ALLOWED_HOSTS}")
+except Exception:
+    pass
