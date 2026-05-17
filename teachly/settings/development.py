@@ -1,5 +1,6 @@
 from .base import *
 import os
+from importlib.util import find_spec
 
 DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
@@ -19,10 +20,10 @@ AUTH_PASSWORD_VALIDATORS = []
 # inherits from base.py and can be overridden using environment variables.
 
 # Development-specific apps
-INSTALLED_APPS += [
-    'django_extensions',
-    
-]
+if find_spec("django_extensions") is not None:
+    INSTALLED_APPS += [
+        "django_extensions",
+    ]
 
 REST_FRAMEWORK = {
     # ... your existing DRF settings
