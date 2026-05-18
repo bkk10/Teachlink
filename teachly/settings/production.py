@@ -12,6 +12,11 @@ def _csv_env(key):
 
 # Prefer explicit hosts from env; add Render hostname fallback to avoid DisallowedHost.
 ALLOWED_HOSTS = _csv_env("ALLOWED_HOSTS")
+vercel_url = os.getenv("VERCEL_URL", "").strip()
+if vercel_url and vercel_url not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(vercel_url)
+if ".vercel.app" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".vercel.app")
 render_external_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
 if render_external_hostname and render_external_hostname not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(render_external_hostname)
