@@ -26,6 +26,7 @@ from django.contrib.auth import authenticate, login, logout, update_session_auth
 from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.urls import reverse
@@ -176,6 +177,19 @@ def difficulty_display_label(level: str) -> str:
         'UNKNOWN': 'Unknown',
     }
     return mapping.get((level or 'UNKNOWN').upper(), 'Unknown')
+
+
+def _is_sqlite_backend() -> bool:
+    engine = str(settings.DATABASES.get('default', {}).get('ENGINE', '')).lower()
+    return engine.endswith('sqlite3')
+
+
+def _safe_maintenance(task_name: str, fn, *args, **kwargs) -> None:
+    """Run non-critical refresh tasks without breaking request responses."""
+    try:
+        fn(*args, **kwargs)
+    except Exception:
+        logger.exception("Maintenance task failed: %s", task_name)
 
 
 def _login_and_redirect_by_role(request, user):
@@ -2239,6 +2253,7 @@ class TeacherDashboardAPI(APIView):
     def get(self, request, format=None):
         """Get all dashboard data in one request"""
         teacher = request.user
+        sqlite_backend = _is_sqlite_backend()
         
         # Get optional course_id filter
         course_id = request.query_params.get('course_id')
@@ -2246,11 +2261,15 @@ class TeacherDashboardAPI(APIView):
         if course_id:
             selected_course = Course.objects.filter(id=course_id, teacher=teacher).first()
 
-        # Recompute risk and alerts to avoid stale UB: ensure dashboard summary is consistent.
-        AlertGenerator.check_and_generate_alerts(recalculate_risk=True, course_id=course_id)
-
-        # Keep unresolved alerts aligned with latest enrollment risk state.
-        AlertGenerator._resolve_old_alerts()
+        # Recompute risk/alerts when backend supports reliable writes.
+        if not sqlite_backend:
+            _safe_maintenance(
+                "check_and_generate_alerts",
+                AlertGenerator.check_and_generate_alerts,
+                recalculate_risk=True,
+                course_id=course_id,
+            )
+            _safe_maintenance("resolve_old_alerts", AlertGenerator._resolve_old_alerts)
 
         # Provide CSV export endpoint for teacher sharing (My Students export requirement).
         if request.query_params.get('export') == 'csv':
@@ -2313,9 +2332,14 @@ class TeacherDashboardAPI(APIView):
             status='ACTIVE'
         ).select_related('student', 'course')
         
-        # Refresh lesson difficulty snapshots so labels and failure rates stay in sync.
-        for course in courses:
-            DifficultyAnalyzer.analyze_course_difficulties(str(course.id))
+        # Refresh difficulty snapshots only on writable backends.
+        if not sqlite_backend:
+            for course in courses:
+                _safe_maintenance(
+                    f"analyze_course_difficulties:{course.id}",
+                    DifficultyAnalyzer.analyze_course_difficulties,
+                    str(course.id),
+                )
         
         # Calculate KPIs with unique student count
         total_students = enrollments.count()
@@ -2372,10 +2396,6 @@ class TeacherDashboardAPI(APIView):
                 ),
             })
 
-        # Refresh lesson difficulty snapshots so labels and failure rates stay in sync.
-        for course in courses:
-            DifficultyAnalyzer.analyze_course_difficulties(str(course.id))
-        
         unresolved_alerts = Alert.objects.filter(
             teacher=teacher,
             status__in=['ACTIVE', 'ACKNOWLEDGED'],
@@ -3839,17 +3859,27 @@ class DifficultyAPI(APIView):
         """Get difficulty data for charts"""
         teacher = request.user
         course_id = request.query_params.get('course_id')
+        sqlite_backend = _is_sqlite_backend()
 
         # Keep difficulty snapshots fresh so all pages show consistent values.
-        if course_id:
-            DifficultyAnalyzer.analyze_course_difficulties(str(course_id))
-        else:
-            teacher_course_ids = Course.objects.filter(
-                teacher=teacher,
-                status=Course.Status.PUBLISHED
-            ).values_list('id', flat=True)
-            for cid in teacher_course_ids:
-                DifficultyAnalyzer.analyze_course_difficulties(str(cid))
+        if not sqlite_backend:
+            if course_id:
+                _safe_maintenance(
+                    f"analyze_course_difficulties:{course_id}",
+                    DifficultyAnalyzer.analyze_course_difficulties,
+                    str(course_id),
+                )
+            else:
+                teacher_course_ids = Course.objects.filter(
+                    teacher=teacher,
+                    status=Course.Status.PUBLISHED
+                ).values_list('id', flat=True)
+                for cid in teacher_course_ids:
+                    _safe_maintenance(
+                        f"analyze_course_difficulties:{cid}",
+                        DifficultyAnalyzer.analyze_course_difficulties,
+                        str(cid),
+                    )
         
         difficulties = LessonDifficulty.objects.filter(
             lesson__module__course__teacher=teacher

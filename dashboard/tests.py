@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from unittest.mock import patch
+from courses.models import Course
 
 
 class DashboardAuthFlowTests(TestCase):
@@ -106,3 +107,43 @@ class DashboardAuthFlowTests(TestCase):
         with patch('dashboard.views._login_and_redirect_by_role', side_effect=Exception('boom')):
             response = self.client.post(reverse('demo_login'), {'role': 'TEACHER'})
         self.assertRedirects(response, reverse('custom_login'))
+
+
+class DashboardApiResilienceTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.teacher = self.User.objects.create_user(
+            email='api.teacher@example.com',
+            username='apiteacher',
+            display_name='API Teacher',
+            role='TEACHER',
+            password='StrongPass123!',
+            is_active=True,
+        )
+        self.client.force_login(self.teacher)
+        self.course = Course.objects.create(
+            title='API Course',
+            description='Course for API resilience tests',
+            teacher=self.teacher,
+            status=Course.Status.PUBLISHED,
+        )
+
+    @patch('dashboard.views.DifficultyAnalyzer.analyze_course_difficulties', side_effect=Exception('difficulty-write-failed'))
+    @patch('dashboard.views.AlertGenerator._resolve_old_alerts', side_effect=Exception('resolve-failed'))
+    @patch('dashboard.views.AlertGenerator.check_and_generate_alerts', side_effect=Exception('alert-write-failed'))
+    @patch('dashboard.views._is_sqlite_backend', return_value=False)
+    def test_teacher_api_survives_refresh_failures(self, _sqlite_mock, _alerts_mock, _resolve_mock, _difficulty_mock):
+        response = self.client.get(reverse('teacher_api'))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn('kpi', payload)
+        self.assertIn('courses', payload)
+
+    @patch('dashboard.views.DifficultyAnalyzer.analyze_course_difficulties', side_effect=Exception('difficulty-write-failed'))
+    @patch('dashboard.views._is_sqlite_backend', return_value=False)
+    def test_difficulty_api_survives_refresh_failures(self, _sqlite_mock, _difficulty_mock):
+        response = self.client.get(reverse('difficulty_api'), {'course_id': str(self.course.id)})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn('distribution', payload)
+        self.assertIn('hardest_lessons', payload)

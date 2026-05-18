@@ -171,7 +171,7 @@ function loadCourses() {
         // Remove the headers line - session cookie handles authentication
         success: function(data) {
             console.log('Courses loaded:', data);
-            courses = data;
+            courses = Array.isArray(data) ? data : (data && data.results ? data.results : []);
             displayCourses();
         },
         error: function(xhr) {
@@ -383,7 +383,8 @@ function loadStudents(courseId) {
         method: 'GET',
         // headers: { 'Authorization': 'Bearer ' + getAuthToken() },
         success: function(students) {
-            displayStudents(students);
+            const rows = Array.isArray(students) ? students : (students && students.results ? students.results : []);
+            displayStudents(rows);
         },
         error: function(xhr) {
             console.error('Failed to load students', xhr.status, xhr.responseText);
