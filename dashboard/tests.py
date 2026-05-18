@@ -107,6 +107,7 @@ class DashboardAuthFlowTests(TestCase):
         with patch('dashboard.views._login_and_redirect_by_role', side_effect=Exception('boom')):
             response = self.client.post(reverse('demo_login'), {'role': 'TEACHER'})
         self.assertRedirects(response, reverse('custom_login'))
+        self.assertNotIn('_auth_user_id', self.client.session)
 
 
 class DashboardApiResilienceTests(TestCase):

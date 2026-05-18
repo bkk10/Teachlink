@@ -270,6 +270,8 @@ def demo_login(request):
     try:
         return _login_and_redirect_by_role(request, demo_user)
     except Exception:
+        if request.user.is_authenticated:
+            logout(request)
         logger.exception("Demo login failed for role=%s user=%s", requested_role, getattr(demo_user, "id", None))
         messages.error(request, 'Demo login is temporarily unavailable. Please try again.')
         return redirect('custom_login')
