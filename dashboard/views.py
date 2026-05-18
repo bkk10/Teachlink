@@ -20,6 +20,7 @@ from decimal import Decimal
 import json
 import os
 import csv
+import logging
 
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.shortcuts import redirect, render
@@ -41,6 +42,8 @@ from analytics.services.difficulty_analyzer import DifficultyAnalyzer
 from users.permissions import IsTeacher, IsStudent
 
 from rest_framework.authentication import BaseAuthentication
+
+logger = logging.getLogger(__name__)
 
 RISK_ALERT_TYPES = [
     Alert.AlertType.DROPOUT_RISK,
@@ -180,18 +183,21 @@ def _login_and_redirect_by_role(request, user):
     login(request, user)
     if user.role == 'STUDENT':
         ip_address = request.META.get('REMOTE_ADDR')
-        user.update_last_activity(ip_address)
-        enrollments = Enrollment.objects.filter(
-            student=user,
-            status=Enrollment.Status.ACTIVE
-        )
-        for enrollment in enrollments:
-            enrollment.update_last_activity()
-            # Only recalculate risk if not done in the last hour
-            last_calc = RiskHistory.objects.filter(enrollment=enrollment).order_by('-calculated_at').first()
-            if not last_calc or (timezone.now() - last_calc.calculated_at).total_seconds() > 3600:
-                RiskEngine.calculate_student_risk(str(enrollment.id))
-                AlertGenerator.check_and_generate_alerts(enrollment_id=str(enrollment.id))
+        try:
+            user.update_last_activity(ip_address)
+            enrollments = Enrollment.objects.filter(
+                student=user,
+                status=Enrollment.Status.ACTIVE
+            )
+            for enrollment in enrollments:
+                enrollment.update_last_activity()
+                # Only recalculate risk if not done in the last hour
+                last_calc = RiskHistory.objects.filter(enrollment=enrollment).order_by('-calculated_at').first()
+                if not last_calc or (timezone.now() - last_calc.calculated_at).total_seconds() > 3600:
+                    RiskEngine.calculate_student_risk(str(enrollment.id))
+                    AlertGenerator.check_and_generate_alerts(enrollment_id=str(enrollment.id))
+        except Exception:
+            logger.exception("Student side-effects failed during login for user=%s", user.id)
 
     if user.role == 'TEACHER':
         return redirect('teacher_dashboard')
@@ -247,7 +253,12 @@ def demo_login(request):
         messages.error(request, 'Demo account is not available. Please run demo seed setup.')
         return redirect('custom_login')
 
-    return _login_and_redirect_by_role(request, demo_user)
+    try:
+        return _login_and_redirect_by_role(request, demo_user)
+    except Exception:
+        logger.exception("Demo login failed for role=%s user=%s", requested_role, getattr(demo_user, "id", None))
+        messages.error(request, 'Demo login is temporarily unavailable. Please try again.')
+        return redirect('custom_login')
 
 
 def custom_register(request):

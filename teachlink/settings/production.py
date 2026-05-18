@@ -43,6 +43,8 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+    # Serverless-safe fallback: avoid DB-backed session writes on ephemeral/readonly SQLite.
+    SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
 
 # Security settings
 SECURE_SSL_REDIRECT = True
