@@ -13,10 +13,13 @@ def _default_settings_module() -> str:
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault(
-        "DJANGO_SETTINGS_MODULE",
-        os.environ.get("DJANGO_SETTINGS_MODULE", _default_settings_module()),
-    )
+    if "test" in sys.argv:
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "teachly.settings.development")
+    else:
+        os.environ.setdefault(
+            "DJANGO_SETTINGS_MODULE",
+            os.environ.get("DJANGO_SETTINGS_MODULE", _default_settings_module()),
+        )
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

@@ -586,8 +586,14 @@ def courses_overview(request):
             completion_rate = round((len(completed_lesson_ids) / len(lessons)) * 100, 1) if lessons else 0.0
             
             # Sync enrollment progress to ensure consistency across pages
-            enrollment.update_progress()
-            enrollment.refresh_from_db()
+            try:
+                enrollment.update_progress()
+                enrollment.refresh_from_db()
+            except Exception:
+                logger.exception(
+                    "Could not persist enrollment progress for enrollment=%s",
+                    enrollment.id,
+                )
             
             # Calculate SVG circle progress offset (circumference = 2 * pi * 26 ≈ 163.36)
             progress_offset = 163.36 - (163.36 * completion_rate / 100)

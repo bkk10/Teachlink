@@ -171,6 +171,91 @@ class DashboardApiResilienceTests(TestCase):
                 mock_login.assert_called_once_with(request, self.teacher)
 
 
+class DashboardPageFlowTests(TestCase):
+    """Smoke-test key teacher and student HTML pages."""
+
+    def setUp(self):
+        self.User = get_user_model()
+
+    def _create_demo_teacher(self):
+        return self.User.objects.create_user(
+            email='flow.teacher@teachlink.com',
+            username='flow_teacher',
+            display_name='Flow Teacher',
+            role='TEACHER',
+            password='StrongPass123!',
+            is_active=True,
+        )
+
+    def _create_demo_student(self):
+        return self.User.objects.create_user(
+            email='flow.student01@teachlink.com',
+            username='flow_student',
+            display_name='Flow Student',
+            role='STUDENT',
+            password='StrongPass123!',
+            is_active=True,
+        )
+
+    def test_teacher_core_pages_load(self):
+        teacher = self._create_demo_teacher()
+        Course.objects.create(
+            title='Flow Course',
+            description='Course for page flow tests',
+            teacher=teacher,
+            status=Course.Status.PUBLISHED,
+        )
+        self.client.force_login(teacher)
+
+        for route_name in (
+            'teacher_dashboard',
+            'dashboard_courses',
+            'alerts_center',
+            'dashboard_profile',
+        ):
+            response = self.client.get(reverse(route_name))
+            self.assertEqual(response.status_code, 200, msg=route_name)
+
+    def test_student_core_pages_load(self):
+        teacher = self._create_demo_teacher()
+        student = self._create_demo_student()
+        course = Course.objects.create(
+            title='Student Flow Course',
+            description='Course for student page flow tests',
+            teacher=teacher,
+            status=Course.Status.PUBLISHED,
+        )
+        from courses.models import Enrollment
+        Enrollment.objects.create(
+            student=student,
+            course=course,
+            status=Enrollment.Status.ACTIVE,
+        )
+        self.client.force_login(student)
+
+        for route_name in (
+            'student_dashboard',
+            'dashboard_courses',
+            'dashboard_profile',
+        ):
+            response = self.client.get(reverse(route_name))
+            self.assertEqual(response.status_code, 200, msg=route_name)
+
+    @patch('dashboard.views._uses_signed_cookie_sessions', return_value=True)
+    def test_teacher_courses_renders_without_static_manifest(self, _signed_mock):
+        from django.template.loader import render_to_string
+
+        teacher = self._create_demo_teacher()
+        with self.settings(
+            STATICFILES_STORAGE='whitenoise.storage.CompressedStaticFilesStorage',
+        ):
+            html = render_to_string(
+                'dashboard/teacher/courses.html',
+                {'courses': Course.objects.filter(teacher=teacher)},
+            )
+        self.assertIn('Course Management', html)
+
+
 class DemoAccountsTests(TestCase):
     def test_ensure_minimal_demo_accounts_creates_users(self):
         from dashboard.demo_accounts import ensure_minimal_demo_accounts
