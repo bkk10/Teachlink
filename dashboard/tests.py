@@ -148,3 +148,40 @@ class DashboardApiResilienceTests(TestCase):
         payload = response.json()
         self.assertIn('distribution', payload)
         self.assertIn('hardest_lessons', payload)
+
+    @patch('dashboard.views.AlertGenerator._resolve_old_alerts', side_effect=Exception('resolve-failed'))
+    @patch('dashboard.views._is_sqlite_backend', return_value=False)
+    def test_alerts_api_survives_resolve_failures(self, _sqlite_mock, _resolve_mock):
+        response = self.client.get(reverse('alerts_api'))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn('alerts', payload)
+        self.assertIn('summary', payload)
+
+    def test_session_login_with_signed_cookie_sessions(self):
+        from django.test import RequestFactory
+        from dashboard.views import _session_login
+
+        request = RequestFactory().get('/')
+        request.session = self.client.session
+
+        with patch('dashboard.views._uses_signed_cookie_sessions', return_value=True):
+            with patch('dashboard.views.login') as mock_login:
+                _session_login(request, self.teacher)
+                mock_login.assert_called_once_with(request, self.teacher)
+
+
+class DemoAccountsTests(TestCase):
+    def test_ensure_minimal_demo_accounts_creates_users(self):
+        from dashboard.demo_accounts import ensure_minimal_demo_accounts
+
+        User = get_user_model()
+        User.objects.filter(email__icontains='demo.').delete()
+
+        created = ensure_minimal_demo_accounts()
+        self.assertTrue(created)
+        self.assertTrue(User.objects.filter(email='demo.teacher@teachlink.com').exists())
+        self.assertTrue(User.objects.filter(email='demo.student01@teachlink.com').exists())
+
+        created_again = ensure_minimal_demo_accounts()
+        self.assertFalse(created_again)

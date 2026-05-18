@@ -13,6 +13,9 @@ fi
 echo "Running migrations..."
 python manage.py migrate --noinput
 
+echo "Ensuring demo accounts exist..."
+python manage.py create_demo_classroom || echo "Demo seed skipped (non-fatal)"
+
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 

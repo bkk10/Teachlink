@@ -46,11 +46,20 @@ else:
     # Serverless-safe fallback: avoid DB-backed session writes on ephemeral/readonly SQLite.
     SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
 
-# Security settings
-SECURE_SSL_REDIRECT = True
+# Security settings (Vercel/Render terminate TLS at the edge)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'true').lower() == 'true'
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_BROWSER_XSS_FILTER = True
+
+CSRF_TRUSTED_ORIGINS = _csv_env('CSRF_TRUSTED_ORIGINS')
+for origin in (
+    f'https://{vercel_url}' if vercel_url else None,
+    f'https://{render_external_hostname}' if render_external_hostname else None,
+):
+    if origin and origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
 
 # Static files
 STATIC_ROOT = BASE_DIR / 'staticfiles'

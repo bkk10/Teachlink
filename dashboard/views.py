@@ -23,6 +23,8 @@ import csv
 import logging
 
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.models import update_last_login
+from django.contrib.auth.signals import user_logged_in
 from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -184,6 +186,31 @@ def _is_sqlite_backend() -> bool:
     return engine.endswith('sqlite3')
 
 
+def _uses_signed_cookie_sessions() -> bool:
+    session_engine = getattr(
+        settings,
+        'SESSION_ENGINE',
+        'django.contrib.sessions.backends.db',
+    )
+    return session_engine == 'django.contrib.sessions.backends.signed_cookies'
+
+
+def _session_login(request, user) -> None:
+    """
+    Establish a session without requiring writable DB (serverless SQLite fallback).
+    Skips last_login persistence when signed-cookie sessions are in use.
+    """
+    if not _uses_signed_cookie_sessions():
+        login(request, user)
+        return
+
+    user_logged_in.disconnect(update_last_login, dispatch_uid='update_last_login')
+    try:
+        login(request, user)
+    finally:
+        user_logged_in.connect(update_last_login, dispatch_uid='update_last_login')
+
+
 def _safe_maintenance(task_name: str, fn, *args, **kwargs) -> None:
     """Run non-critical refresh tasks without breaking request responses."""
     try:
@@ -194,7 +221,7 @@ def _safe_maintenance(task_name: str, fn, *args, **kwargs) -> None:
 
 def _login_and_redirect_by_role(request, user):
     """Log user in and redirect to the correct dashboard with student side effects."""
-    login(request, user)
+    _session_login(request, user)
     if user.role == 'STUDENT':
         ip_address = request.META.get('REMOTE_ADDR')
         try:
@@ -3252,7 +3279,8 @@ class AlertManagementAPI(APIView):
     def get(self, request, format=None):
         """Get alerts with filtering"""
         teacher = request.user
-        AlertGenerator._resolve_old_alerts()
+        if not _is_sqlite_backend():
+            _safe_maintenance("resolve_old_alerts", AlertGenerator._resolve_old_alerts)
         
         # Filter parameters
         status_filter = request.query_params.get('status', 'ACTIVE,ACKNOWLEDGED')
@@ -3324,8 +3352,16 @@ class AlertManagementAPI(APIView):
         ).select_related('student', 'course').order_by('status_rank', 'severity_rank', '-generated_at')
         
         # Pagination
-        limit = int(request.query_params.get('limit', 50))
-        offset = int(request.query_params.get('offset', 0))
+        try:
+            limit = int(request.query_params.get('limit', 50))
+            offset = int(request.query_params.get('offset', 0))
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'limit and offset must be integers'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        limit = max(1, min(limit, 200))
+        offset = max(0, offset)
         total = alerts.count()
         page_alerts = alerts[offset:offset + limit]
         
