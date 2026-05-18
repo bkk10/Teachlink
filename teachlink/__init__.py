@@ -1,0 +1,3 @@
+"""
+Teachly project package
+"""

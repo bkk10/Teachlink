@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Django local artifacts
+db.sqlite3
+staticfiles/
+media/
+
+# Environment files
+.env
+.env.*
+
+# Tooling
+.pytest_cache/
+.mypy_cache/

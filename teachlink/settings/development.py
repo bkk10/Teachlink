@@ -1,8 +1,14 @@
 from .base import *
 import os
+from importlib.util import find_spec
 
 DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+vercel_url = os.getenv("VERCEL_URL", "").strip()
+if vercel_url and vercel_url not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(vercel_url)
+if ".vercel.app" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".vercel.app")
 
 # Use SQLite for initial development (switch to PostgreSQL later)
 DATABASES = {
@@ -19,10 +25,10 @@ AUTH_PASSWORD_VALIDATORS = []
 # inherits from base.py and can be overridden using environment variables.
 
 # Development-specific apps
-INSTALLED_APPS += [
-    'django_extensions',
-    
-]
+if find_spec("django_extensions") is not None:
+    INSTALLED_APPS += [
+        "django_extensions",
+    ]
 
 REST_FRAMEWORK = {
     # ... your existing DRF settings
@@ -30,8 +36,8 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'TeachLink API',
-    'DESCRIPTION': 'TeachLink API Documentation',
+    'TITLE': 'Teachly API',
+    'DESCRIPTION': 'Teachly API Documentation',
     'VERSION': '1.0.0',
 }
 

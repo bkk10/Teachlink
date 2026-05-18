@@ -7,7 +7,7 @@ import sys
 import django
 
 # Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachlink.settings.development')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'teachly.settings.development')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 django.setup()
 

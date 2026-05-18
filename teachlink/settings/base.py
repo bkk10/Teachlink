@@ -1,5 +1,5 @@
 """
-Django base settings for TeachLink project.
+Django base settings for Teachly project.
 """
 from pathlib import Path
 from datetime import timedelta
@@ -46,10 +46,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'teachlink.middleware.TokenMiddleware',
+    'teachly.middleware.TokenMiddleware',
 ]
 
-ROOT_URLCONF = 'teachlink.urls'
+ROOT_URLCONF = 'teachly.urls'
 
 TEMPLATES = [
     {
@@ -68,7 +68,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'teachlink.wsgi.application'
+WSGI_APPLICATION = 'teachly.wsgi.application'
 
 # Custom user model
 AUTH_USER_MODEL = 'users.User'
@@ -166,18 +166,28 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
 # Cache settings
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+_redis_url = os.getenv("REDIS_URL", "").strip()
+if _redis_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": _redis_url,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
         }
     }
-}
+else:
+    # Safe fallback for environments where Redis is not configured.
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "teachlink-local-cache",
+        }
+    }
 
-# TeachLink custom settings
-TEACHLINK_CONFIG = {
+# Teachly custom settings
+TEACHLY_CONFIG = {
     'RISK_THRESHOLDS': {
         'HIGH': 0.7,
         'MEDIUM': 0.4,
@@ -194,7 +204,7 @@ TEACHLINK_CONFIG = {
 
 # drf-spectacular API documentation settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'TeachLink API',
+    'TITLE': 'Teachly API',
     'DESCRIPTION': 'Educational platform for student-teacher interaction and analytics',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
@@ -212,7 +222,7 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() == 'true'
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'false').lower() == 'true'
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@teachlink.com')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@teachly.com')
 
 # Security headers
 SECURE_BROWSER_XSS_FILTER = True

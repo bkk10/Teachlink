@@ -4,6 +4,11 @@ from importlib.util import find_spec
 
 DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+vercel_url = os.getenv("VERCEL_URL", "").strip()
+if vercel_url and vercel_url not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(vercel_url)
+if ".vercel.app" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".vercel.app")
 
 # Use SQLite for initial development (switch to PostgreSQL later)
 DATABASES = {
