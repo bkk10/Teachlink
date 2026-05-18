@@ -17,14 +17,16 @@ class TokenMiddleware(MiddlewareMixin):
         """
         Extract token from Authorization header and store in session
         """
-        print(f"TokenMiddleware processing request for {request.path}")
-        print(f"   User authenticated: {request.user.is_authenticated}")
-        
-        # Skip for non-authenticated users
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
+        if not hasattr(request, "user"):
             return
-        
-        # For session-based auth, just set a simple token
-        request.session['auth_token'] = 'session-authenticated'
-        request.auth_token = 'session-authenticated'
-        print(f"   Set session token for {request.user.email}")
+
+        try:
+            if not request.user.is_authenticated:
+                return
+            # For session-based auth, set a simple token for templates.
+            request.session["auth_token"] = "session-authenticated"
+            request.auth_token = "session-authenticated"
+        except Exception as exc:
+            # Avoid taking down public pages if auth/session backend is unavailable.
+            logger.warning("TokenMiddleware skipped due to auth/session error: %s", exc)
+            return
